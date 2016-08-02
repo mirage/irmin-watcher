@@ -1,12 +1,12 @@
 description = "Irmin watchers"
 version = "%%VERSION%%"
-requires = "lwt fmt logs irmin-watcher.fsevents irmin-watcher.inotify"
+requires = "lwt fmt logs %%REQUIRES%%"
 archive(byte) = "irmin-watcher.cma"
 archive(native) = "irmin-watcher.cmxa"
 plugin(byte) = "irmin-watcher.cma"
 plugin(native) = "irmin-watcher.cmxs"
 
-package "fsevents" {
+package "fsevents" (
   description = "FSevents backend for Irmin watchers"
   version = "%%VERSION%%"
   requires = "osx-fsevents.lwt"
@@ -15,9 +15,9 @@ package "fsevents" {
   plugin(byte) = "irmin-watcher-fsevents.cma"
   plugin(native) = "irmin-watcher-fsevents.cmxs"
   exists_if = "irmin-watcher-fsevents.cma"
-}
+)
 
-package "inotify" {
+package "inotify" (
   description = "Inotify backend for Irmin watchers"
   version = "%%VERSION%%"
   requires = "inotify.lwt"
@@ -26,4 +26,4 @@ package "inotify" {
   plugin(byte) = "irmin-watcher-inotify.cma"
   plugin(native) = "irmin-watcher-inotify.cmxs"
   exists_if = "irmin-watcher-inotify.cma"
-}
+)
