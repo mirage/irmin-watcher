@@ -1,0 +1,4 @@
+PKG bytes topkg inotify fsevents alcotest lwt fmt logs osx-fsevents.lwt
+S src
+S test
+B _build/**

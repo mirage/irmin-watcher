@@ -1,0 +1,7 @@
+true: bin_annot, safe_string, package(bytes)
+true: warn_error(+1..49), warn(A-4-41-44)
+
+true: package(lwt), package(logs), package(fmt), package(astring)
+
+<src> : include
+<src/irmin_watcher_fsevents.*>: package(osx-fsevents.lwt), thread
