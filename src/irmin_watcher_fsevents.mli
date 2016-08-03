@@ -4,16 +4,14 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** FSevents Irmin watchers
+(** FSevents backend for Irmin watchers.
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
-(** {1 FSevents Irmin-watcher} *)
-
-val hook: int -> string -> (string -> unit Lwt.t) -> (unit -> unit) Lwt.t
+val hook: Irmin_watcher_core.t
 (** [hook id p f] is the hook calling [f] everytime a sub-path of [p]
-    is modified. Return a function to call to remove the hook. Default to
-    polling if no better solution is available. *)
+    is modified. Return a function to call to remove the hook. Use the
+    FSevent framework to be notified on filesystem changes. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

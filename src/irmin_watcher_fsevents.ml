@@ -6,28 +6,20 @@
 
 open Lwt.Infix
 
-let src = Logs.Src.create "watcher-fsevents" ~doc:"FSevents Irmin watcher"
+let src = Logs.Src.create "irw-fsevents" ~doc:"Irmin watcher using FSevents"
 module Log = (val Logs.src_log src : Logs.LOG)
-
-type hook = int -> string -> (string -> unit Lwt.t) -> (unit -> unit) Lwt.t
-
-(* run [t] and returns an handler to stop the task. *)
-let stoppable t =
-  let s, u = Lwt.task () in
-  Lwt.async (fun () -> Lwt.pick ([s; t ()]));
-  function () -> Lwt.wakeup u ()
 
 let create_flags = Fsevents.CreateFlags.detailed_interactive
 let run_loop_mode = Cf.RunLoop.Mode.Default
 
-let hook: hook = fun id dir fn ->
+let listen dir fn =
   let watcher = Fsevents_lwt.create 0. create_flags [dir] in
   let stream = Fsevents_lwt.stream watcher in
   let event_stream = Fsevents_lwt.event_stream watcher in
   let path_of_event { Fsevents_lwt.path; _ } = path in
   let iter () = Lwt_stream.iter_s (fun e ->
       let path = path_of_event e in
-      Log.debug (fun l -> l "Got an event (%d): %s" id path);
+      Logs.debug (fun l -> l "fsevents: %s" path);
       fn @@ path
     ) stream
   in
@@ -36,7 +28,7 @@ let hook: hook = fun id dir fn ->
       if not (Fsevents.start event_stream)
       then prerr_endline "failed to start FSEvents stream")
   >|= fun _scheduler ->
-  let stop_iter = stoppable iter in
+  let stop_iter = Irmin_watcher_core.stoppable iter in
   let stop_scheduler () =
     (* Fsevents_lwt.flush watcher >>= fun () ->*)
     Fsevents_lwt.stop watcher;
@@ -45,6 +37,26 @@ let hook: hook = fun id dir fn ->
   fun () ->
     stop_iter ();
     stop_scheduler ()
+
+let t = Irmin_watcher_core.Watchdog.empty ()
+
+(* Note: we use FSevents to detect any change, and we re-read the full
+   tree on every change (so very similar to active polling, but
+   blocking on incoming FSevents instead of sleeping). We could
+   probably do better, but at the moment it is more robust to do so,
+   to avoid possible duplicated events. *)
+let hook =
+  let open Irmin_watcher_core in
+  let wait_for_changes dir () =
+    let t, u = Lwt.task () in
+    listen dir (fun _path -> Lwt.wakeup u (); Lwt.return_unit) >>= fun u ->
+    t >|= fun () ->
+    u ()
+  in
+  let listen dir f =
+    Irmin_watcher_polling.listen ~wait_for_changes:(wait_for_changes dir) ~dir f
+  in
+  create t listen
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

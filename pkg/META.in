@@ -1,15 +1,37 @@
 description = "Irmin watchers"
 version = "%%VERSION%%"
-requires = "lwt fmt logs %%REQUIRES%%"
+requires = "%%REQUIRES%%"
 archive(byte) = "irmin-watcher.cma"
 archive(native) = "irmin-watcher.cmxa"
 plugin(byte) = "irmin-watcher.cma"
 plugin(native) = "irmin-watcher.cmxs"
 
+package "core" (
+  description = "Core functions for Irmin watchers"
+  version = "%%VERSION%%"
+  requires = "lwt fmt logs astring"
+  archive(byte) = "irmin-watcher-core.cma"
+  archive(native) = "irmin-watcher-core.cmxa"
+  plugin(byte) = "irmin-watcher-core.cma"
+  plugin(native) = "irmin-watcher-core.cmxs"
+  exists_if = "irmin-watcher-core.cma"
+)
+
+package "polling" (
+  description = "Polling backend for Irmin watchers"
+  version = "%%VERSION%%"
+  requires = "irmin-watcher.core lwt astring"
+  archive(byte) = "irmin-watcher-polling.cma"
+  archive(native) = "irmin-watcher-polling.cmxa"
+  plugin(byte) = "irmin-watcher-polling.cma"
+  plugin(native) = "irmin-watcher-polling.cmxs"
+  exists_if = "irmin-watcher-polling.cma"
+)
+
 package "fsevents" (
   description = "FSevents backend for Irmin watchers"
   version = "%%VERSION%%"
-  requires = "osx-fsevents.lwt"
+  requires = "osx-fsevents.lwt irmin-watcher.polling osx-cf.lwt"
   archive(byte) = "irmin-watcher-fsevents.cma"
   archive(native) = "irmin-watcher-fsevents.cmxa"
   plugin(byte) = "irmin-watcher-fsevents.cma"

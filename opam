@@ -20,4 +20,5 @@ build: [
   "ocaml" "pkg/pkg.ml" "build"
     "--pinned" pinned
     "--with-fsevents" osx-fsevents:installed
+    "--with-inotify" inotify:installed
 ]
