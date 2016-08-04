@@ -15,7 +15,7 @@ depends: [
   "alcotest"   {test}
   "lwt" "logs" "fmt" "astring"
 ]
-depopts: ["inotify" "fsevents"]
+depopts: ["inotify" "osx-fsevents"]
 build: [
   "ocaml" "pkg/pkg.ml" "build"
     "--pinned" pinned
@@ -23,7 +23,7 @@ build: [
     "--with-inotify" inotify:installed
 ]
 build-test: [
-  ["ocaml" "pkg/pkg.ml" "build" "--tests" true
+  ["ocaml" "pkg/pkg.ml" "build" "--tests" "true"
      "--pinned" pinned
      "--with-fsevents" osx-fsevents:installed
      "--with-inotify" inotify:installed]
