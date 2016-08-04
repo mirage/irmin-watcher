@@ -1,11 +1,19 @@
 language: c
 install: wget https://raw.githubusercontent.com/ocaml/ocaml-travisci-skeleton/master/.travis-opam.sh
 script: bash -ex .travis-opam.sh
+cache: apt
 sudo: required
+dist: trusty
 env:
   global:
   - ALCOTEST_SHOW_ERRORS=1
   - PINS="osx-cf:https://github.com/samoht/ocaml-osx-cf"
   matrix:
-  - OCAML_VERSION=4.02
-  - OCAML_VERSION=4.03
+  - env: OCAML_VERSION=4.02
+    os: linux
+  - env: OCAML_VERSION=4.03
+    os: linux
+  - env: OCAML_VERSION=4.03 DEPOPTS=osx-fsevents
+    os: osx
+  - env: OCAML_VERSION=4.03 DEPOPTS=inotify
+    os: linux
