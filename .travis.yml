@@ -7,7 +7,7 @@ dist: trusty
 env:
   global:
   - ALCOTEST_SHOW_ERRORS=1
-  - PINS="osx-cf:https://github.com/samoht/ocaml-osx-cf"
+  - PINS="osx-cf:https://github.com/samoht/ocaml-osx-cf.git#topkg"
 matrix:
   include:
   - env: OCAML_VERSION=4.02
