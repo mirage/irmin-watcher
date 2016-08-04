@@ -22,3 +22,10 @@ build: [
     "--with-fsevents" osx-fsevents:installed
     "--with-inotify" inotify:installed
 ]
+build-test: [
+  ["ocaml" "pkg/pkg.ml" "build" "--tests" true
+     "--pinned" pinned
+     "--with-fsevents" osx-fsevents:installed
+     "--with-inotify" inotify:installed]
+  ["ocaml" "pkg/pkg.ml" "test"]
+]
