@@ -17,7 +17,7 @@ depends: [
 ]
 depopts: ["inotify" "osx-fsevents"]
 build: [
-  "ocaml" "pkg/pkg.ml" "build"
+  "ocaml" "pkg/pkg.ml" "build" "--tests" "false"
     "--pinned" pinned
     "--with-fsevents" osx-fsevents:installed
     "--with-inotify" inotify:installed
