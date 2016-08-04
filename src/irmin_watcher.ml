@@ -8,7 +8,7 @@ let hook id dir fn =
 #ifdef HAVE_FSEVENTS
   Irmin_watcher_fsevents.hook id dir fn
 #else
-  Polling.hook !default_polling_time id dir fn
+  Irmin_watcher_polling.(hook !default_polling_time) id dir fn
 #endif
 
 (*---------------------------------------------------------------------------
