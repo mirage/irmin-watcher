@@ -1,4 +1,4 @@
-## irmin-watcher — Irmin watchers
+## irmin-watcher — Portable Irmin watch backends using FSevents and Inotify
 
 %%VERSION%%
 
