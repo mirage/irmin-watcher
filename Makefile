@@ -8,4 +8,6 @@ all:
 	  --with-fsevents $(FSEVENTS) --with-inotify $(INOTIFY)
 
 test:
+	ocaml pkg/pkg.ml build --tests true \
+	  --with-fsevents $(FSEVENTS) --with-inotify $(INOTIFY)
 	ocaml pkg/pkg.ml test
