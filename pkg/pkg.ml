@@ -50,12 +50,12 @@ let opams =
 let () =
   Pkg.describe ~build:Build.v ~opams "irmin-watcher" @@ fun c ->
   let fsevents = Conf.value c fsevents in
-  let _inotify  = Conf.value c inotify in
+  let inotify  = Conf.value c inotify in
   Ok [
     Pkg.mllib "src/irmin-watcher.mllib";
     Pkg.mllib "src/irmin-watcher-core.mllib";
     Pkg.mllib "src/irmin-watcher-polling.mllib";
     Pkg.mllib ~cond:fsevents "src/irmin-watcher-fsevents.mllib";
-    (* Pkg.mllib ~cond:inotify "src/irmin-watcher-inotify.mllib"; *)
+    Pkg.mllib ~cond:inotify "src/irmin-watcher-inotify.mllib";
     Pkg.test "test/test";
   ]
