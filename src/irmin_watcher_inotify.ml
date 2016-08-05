@@ -7,7 +7,7 @@
 open Lwt.Infix
 
 let src = Logs.Src.create "irw-inotify" ~doc:"Irmin watcher using Inotify"
-module Log = (val Logs.src_log src : Logs.LOG)
+module Logs = (val Logs.src_log src : Logs.LOG)
 
 let listen dir fn =
   let path_of_event (_, _, _, p) = match p with None -> "" | Some p -> p in
@@ -36,6 +36,7 @@ let t = Irmin_watcher_core.Watchdog.empty ()
    probably do better, but at the moment it is more robust to do so,
    to avoid possible duplicated events. *)
 let hook =
+  Logs.info (fun l -> l "Inotify mode");
   let open Irmin_watcher_core in
   let wait_for_changes dir () =
     let t, u = Lwt.task () in

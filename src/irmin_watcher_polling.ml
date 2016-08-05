@@ -10,8 +10,8 @@ module Digests = Irmin_watcher_core.Digests
 
 let (/) = Filename.concat
 
-let src = Logs.Src.create "irw-poll" ~doc:"Irmin watcher using using polling"
-module Log = (val Logs.src_log src : Logs.LOG)
+let src = Logs.Src.create "irw-polling" ~doc:"Irmin watcher using using polling"
+module Logs = (val Logs.src_log src : Logs.LOG)
 
 let list_files kind dir =
   if Sys.file_exists dir && Sys.is_directory dir then
@@ -58,7 +58,7 @@ let rec poll ~callback ~wait_for_changes dir files =
   let process () =
     if Digests.is_empty diff then Lwt.return_unit
     else (
-      Log.debug (fun f -> f "polling %s: diff:%a" dir Digests.pp diff);
+      Logs.debug (fun f -> f "polling %s: diff:%a" dir Digests.pp diff);
       let files = Digests.files diff in
       Lwt_list.iter_p callback files)
   in
@@ -74,6 +74,7 @@ let listen ~wait_for_changes ~dir callback =
 let default_polling_time = ref 1.
 
 let hook delay =
+  Logs.info (fun l -> l "Polling mode");
   let open Irmin_watcher_core in
   let wait_for_changes () = Lwt_unix.sleep delay in
   let t = Watchdog.empty () in

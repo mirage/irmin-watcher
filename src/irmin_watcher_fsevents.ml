@@ -7,7 +7,7 @@
 open Lwt.Infix
 
 let src = Logs.Src.create "irw-fsevents" ~doc:"Irmin watcher using FSevents"
-module Log = (val Logs.src_log src : Logs.LOG)
+module Logs = (val Logs.src_log src : Logs.LOG)
 
 let create_flags = Fsevents.CreateFlags.detailed_interactive
 let run_loop_mode = Cf.RunLoop.Mode.Default
@@ -54,6 +54,7 @@ let hook =
     u ()
   in
   let listen dir f =
+    Logs.info (fun l -> l "FSevents mode");
     Irmin_watcher_polling.listen ~wait_for_changes:(wait_for_changes dir) ~dir f
   in
   create t listen
