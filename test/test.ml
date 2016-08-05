@@ -43,8 +43,13 @@ let polling_tests = [
   "basic", `Quick, run basic_polling;
 ]
 
+let mode = match Irmin_watcher.mode with
+| `FSEvents -> "fsevents"
+| `Inotify  -> "inotify"
+| `Polling  -> "polling"
+
 let tests = [
-  "polling", polling_tests;
+  mode, polling_tests;
 ]
 
 let () =
