@@ -7,4 +7,4 @@ true: package(lwt), package(logs), package(fmt), package(astring)
 <src/irmin_watcher_fsevents.*>: package(osx-fsevents.lwt), thread
 <src/irmin_watcher_inotify.*>: package(inotify.lwt)
 
-<test/*>: package(alcotest)
+<test/*>: package(alcotest), package(lwt.unix), package(logs.fmt)
