@@ -7,3 +7,4 @@ tmp
 *.native
 *.byte
 pkg/META
+test/_tags

@@ -7,10 +7,19 @@
 let hook id dir fn =
 #ifdef HAVE_FSEVENTS
   Irmin_watcher_fsevents.hook id dir fn
-#elsif HAVE_INOTIFY
+#elif defined HAVE_INOTIFY
   Irmin_watcher_inotify.hook id dir fn
 #else
   Irmin_watcher_polling.(hook !default_polling_time) id dir fn
+#endif
+
+let mode =
+#ifdef HAVE_FSEVENTS
+  `FSEvents
+#elif defined HAVE_INOTIFY
+  `Inotify
+#else
+  `Polling
 #endif
 
 (*---------------------------------------------------------------------------
