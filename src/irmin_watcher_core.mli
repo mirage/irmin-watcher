@@ -91,7 +91,7 @@ module Watchdog: sig
 end
 
 val create: Watchdog.t -> (string -> Watchdog.hook) -> t
-(** [mk_hook t h] is the Irmin watcher using the watchdogs defined in
+(** [create t h] is the Irmin watcher using the watchdogs defined in
     [t] and the update hook [h]. *)
 
 (** {1 Helpers} *)
