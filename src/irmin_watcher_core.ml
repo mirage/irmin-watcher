@@ -8,7 +8,7 @@ open Astring
 open Lwt.Infix
 
 let src = Logs.Src.create "irmin-watcher" ~doc:"Irmin watcher logging"
-module Log = (val Logs.src_log src : Logs.LOG)
+module Logs = (val Logs.src_log src : Logs.LOG)
 
 type t = int -> string -> (string -> unit Lwt.t) -> (unit -> unit) Lwt.t
 
@@ -29,7 +29,7 @@ module Digests = struct
   let of_list l = List.fold_left (fun set elt -> add elt set) empty l
   let sdiff x y = union (diff x y) (diff y x)
   let digest_pp ppf d = Fmt.string ppf @@ Digest.to_hex d
-  let pp ppf t = Fmt.(Dump.list (pair string digest_pp)) ppf @@ elements t
+  let pp ppf t = Fmt.(Dump.list (Dump.pair string digest_pp)) ppf @@ elements t
   let files t =
     elements t |> List.map fst |> String.Set.of_list |> String.Set.elements
 end
@@ -48,7 +48,7 @@ module Callback = struct
   let apply t ~dir ~file =
     let fns = try Hashtbl.find t dir with Not_found -> [] in
     Lwt_list.iter_p (fun (id, f) ->
-        Log.debug (fun f -> f "callback %d" id); f file
+        Logs.debug (fun f -> f "callback %d" id); f file
       ) fns
 
   let add t ~id ~dir fn =
@@ -100,7 +100,7 @@ module Watchdog = struct
                to avoid avoid having too many wathdogs for [dir]. *)
             u ()
         | None   ->
-            Log.debug (fun f -> f "Start watchdog for %s" dir);
+            Logs.debug (fun f -> f "Start watchdog for %s" dir);
             Hashtbl.add t dir u
 
   let stop { t; c } ~dir =
@@ -108,7 +108,7 @@ module Watchdog = struct
     | None      -> assert (Callback.stats c ~dir = 0)
     | Some stop ->
         if Callback.stats c ~dir = 0 then (
-          Log.debug (fun f -> f "Stop watchdog for %s" dir);
+          Logs.debug (fun f -> f "Stop watchdog for %s" dir);
           Hashtbl.remove t dir;
           stop ()
         )

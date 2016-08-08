@@ -1,4 +1,4 @@
-## irmin-watcher — Portable Irmin watch backends using FSevents and Inotify
+## irmin-watcher — Portable Irmin watch backends using FSevents or Inotify
 
 %%VERSION%%
 
@@ -6,9 +6,6 @@ irmin-watcher implements [Irmin's watch hooks][watch] for various OS,
 using FSevents in OSX and Inotify on Linux.
 
 irmin-watcher is distributed under the ISC license.
-
-Homepage: https://github.com/samoht/irmin-watcher
-Contact: Thomas Gazagnaire `<thomas@gazagnaire.org>`
 
 [watch]: http://mirage.github.io/irmin/Irmin.Private.Watch.html
 

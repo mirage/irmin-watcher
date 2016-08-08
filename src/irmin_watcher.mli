@@ -14,6 +14,8 @@ val hook: Irmin_watcher_core.t
     to polling if no better solution is available. FSevents and
     Inotify backends are available. *)
 
+val mode: [`FSEvents | `Inotify | `Polling ]
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
 

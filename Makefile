@@ -13,4 +13,4 @@ test:
 	ocaml pkg/pkg.ml test
 
 clean:
-	rm -rf _build _tests
+	rm -rf _build _tests test/_tags pkg/META

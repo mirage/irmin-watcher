@@ -2,18 +2,27 @@ open Ocamlbuild_plugin
 
 let main_file = "file:src/irmin_watcher.ml"
 
-let dispatch (pkg, name) =
-  let pp_have = S[A "-pp"; A ("cppo -U HAVE_" ^ name)] in
-  flag [main_file; "ocamldep"; "with-" ^ pkg] pp_have;
-  flag [main_file; "ocaml"; "compile"; "with-" ^ pkg] pp_have;
-  let pp_not_have = S[A "-pp"; A ("cppo -D HAVE_" ^ name)] in
-  flag [main_file; "ocamldep"; "without-" ^ pkg] pp_not_have;
-  flag [main_file; "ocaml"; "compile"; "without-" ^ pkg] pp_not_have
+let dispatch pkgs =
+  let options =
+    List.fold_left (fun acc (pkg, name) ->
+        (List.map (fun (tags, flags) ->
+             ("with-" ^ pkg ^ "-true") :: tags,
+             ("-D HAVE_" ^ name) :: flags
+           ) acc) @
+        (List.map (fun (tags, flags) ->
+             ("with-" ^ pkg ^ "-false") :: tags,
+             ("-U HAVE_" ^ name) :: flags
+           ) acc)
+    ) [([], [])] pkgs
+  in
+  List.iter (fun (tags, flags) ->
+      let flags = S[A "-pp"; A ("cppo " ^ String.concat " " flags)] in
+      flag ([main_file; "ocamldep"] @ tags) flags;
+      flag ([main_file; "ocaml"; "compile"] @ tags) flags
+    ) options
 
 let dispatch = function
-| After_rules ->
-    dispatch ("fsevents", "FSEVENTS");
-    dispatch ("inotify" , "INOTIFY")
+| After_rules -> dispatch [ ("fsevents", "FSEVENTS"); ("inotify" , "INOTIFY")]
 | _ -> ()
 
 let () = Ocamlbuild_plugin.dispatch dispatch
