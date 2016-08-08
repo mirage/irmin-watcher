@@ -2,7 +2,7 @@ opam-version: "1.2"
 maintainer: "Thomas Gazagnaire <thomas@gazagnaire.org>"
 authors: ["Thomas Gazagnaire <thomas@gazagnaire.org>"]
 homepage: "https://github.com/samoht/irmin-watcher"
-doc: "https://samoht.github.io/irmin-watcher"
+doc: "https://samoht.github.io/irmin-watcher/"
 license: "ISC"
 dev-repo: "https://github.com/samoht/irmin-watcher.git"
 bug-reports: "https://github.com/samoht/irmin-watcher/issues"
