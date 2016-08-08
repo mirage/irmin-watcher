@@ -4,12 +4,26 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
+let uname =
+  try
+    let ic = Unix.open_process_in "uname" in
+    let uname = input_line ic in
+    let () = close_in ic in
+    Some uname
+  with Unix.Unix_error _ ->
+    None
+
 let hook id dir fn =
 #ifdef HAVE_FSEVENTS
+  let _ = uname in
   Irmin_watcher_fsevents.hook id dir fn
 #elif defined HAVE_INOTIFY
-  Irmin_watcher_inotify.hook id dir fn
+  if uname = Some "Linux" then
+    Irmin_watcher_inotify.hook id dir fn
+  else
+    Irmin_watcher_polling.(hook !default_polling_time) id dir fn
 #else
+  let _ = uname in
   Irmin_watcher_polling.(hook !default_polling_time) id dir fn
 #endif
 
@@ -17,7 +31,7 @@ let mode =
 #ifdef HAVE_FSEVENTS
   `FSEvents
 #elif defined HAVE_INOTIFY
-  `Inotify
+  if uname = Some "Linux" then `Inotify else `Polling
 #else
   `Polling
 #endif
