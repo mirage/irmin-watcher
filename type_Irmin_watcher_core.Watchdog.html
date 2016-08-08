@@ -1,0 +1,26 @@
+<html><head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Irmin_watcher" rel="Chapter" href="Irmin_watcher.html">
+<link title="Irmin_watcher_core" rel="Chapter" href="Irmin_watcher_core.html">
+<link title="Irmin_watcher_polling" rel="Chapter" href="Irmin_watcher_polling.html">
+<link title="Irmin_watcher_fsevents" rel="Chapter" href="Irmin_watcher_fsevents.html">
+<link title="Irmin_watcher_inotify" rel="Chapter" href="Irmin_watcher_inotify.html"><title>Irmin_watcher_core.Watchdog</title>
+</head>
+<body>
+<code class="code"><span class="keyword">sig</span>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;callback&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Callback</span>.t
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;hook&nbsp;=&nbsp;(string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit)&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;empty&nbsp;:&nbsp;unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;clear&nbsp;:&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;start&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;dir:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.hook&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;stop&nbsp;:&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;dir:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit
+<span class="keyword">end</span></code></body></html>
