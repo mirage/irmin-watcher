@@ -63,11 +63,15 @@ let opams =
   let lint_deps_excluding = Some ["cppo"] in
   [Pkg.opam_file ~lint_deps_excluding "opam"]
 
+let metas = [Pkg.meta_file ~install:false "pkg/META.in"]
+
 let () =
-  Pkg.describe ~build:Build.v ~opams "irmin-watcher" @@ fun c ->
+  Pkg.describe ~build:Build.v ~opams ~metas "irmin-watcher" @@
+  fun c ->
   let fsevents = Conf.value c fsevents in
   let inotify  = Conf.value c inotify in
   Ok [
+    Pkg.lib ~built:false "pkg/META";
     Pkg.mllib "src/irmin-watcher.mllib";
     Pkg.mllib "src/irmin-watcher-core.mllib";
     Pkg.mllib "src/irmin-watcher-polling.mllib";
