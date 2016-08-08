@@ -47,7 +47,15 @@ module Build = struct
     Cmd.(ocamlbuild % "-use-ocamlfind" % "-classic-display" %% debug %% cppo c %
          "-build-dir" % build_dir %% of_list files)
 
-  let v = Pkg.build ~pre ~cmd ()
+  let clean os ~build_dir =
+    let ocamlbuild = Conf.tool "ocamlbuild" os in
+    OS.File.delete "pkg/META" >>= fun () ->
+    OS.File.delete "test/_tags" >>= fun () ->
+    OS.Cmd.run @@
+    Cmd.(ocamlbuild % "-use-ocamlfind" % "-classic-display" %
+         "-build-dir" % build_dir % "-clean")
+
+  let v = Pkg.build ~pre ~cmd ~clean ()
 
 end
 
