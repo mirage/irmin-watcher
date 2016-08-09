@@ -42,7 +42,7 @@ package "fsevents" (
 package "inotify" (
   description = "Inotify backend for Irmin watchers"
   version = "%%VERSION%%"
-  requires = "inotify.lwt"
+  requires = "inotify.lwt irmin-watcher.polling"
   archive(byte) = "irmin-watcher-inotify.cma"
   archive(native) = "irmin-watcher-inotify.cmxa"
   plugin(byte) = "irmin-watcher-inotify.cma"
