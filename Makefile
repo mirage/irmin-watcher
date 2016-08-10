@@ -14,3 +14,4 @@ test:
 
 clean:
 	ocaml pkg/pkg.ml clean
+	rm -rf _tests
