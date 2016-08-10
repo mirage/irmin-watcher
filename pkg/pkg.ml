@@ -1,7 +1,6 @@
 #!/usr/bin/env ocaml
 #use "topfind"
 #require "topkg"
-#require "str"
 
 open Topkg
 
@@ -14,21 +13,22 @@ module Build = struct
     let fsevents = Conf.value c fsevents in
     let inotify  = Conf.value c inotify in
     let requires =
-      let fsevents = if fsevents then ["irmin-watcher.fsevents"] else [] in
-      let inotify  = if inotify  then ["irmin-watcher.inotify"] else []  in
-      String.concat " " (fsevents @ inotify)
+      let xfsevents = if fsevents then ["irmin-watcher.fsevents"] else [] in
+      let xinotify  = if inotify  then ["irmin-watcher.inotify"] else []  in
+      let xpolling  =
+        if not (fsevents || inotify) then [ "irmin-watcher.polling" ] else []
+      in
+      String.concat " " (xpolling @ xfsevents @ xinotify)
     in
     OS.File.read "pkg/META.in" >>= fun meta ->
-    let meta = Str.global_replace Str.(regexp "%%REQUIRES%%") requires meta in
-    OS.File.write "pkg/META" meta >>= fun () ->
+    OS.File.write_subst "pkg/META" ["REQUIRES", requires] meta  >>= fun () ->
     let requires =
       if fsevents then "package(osx-fsevents.lwt), package(osx-cf.lwt), thread"
       else if inotify  then "package(inotify.lwt)"
       else "package(unix)"
     in
     OS.File.read "test/_tags.in" >>= fun tags ->
-    let tags = Str.global_replace Str.(regexp "%%REQUIRES%%") requires tags in
-    OS.File.write "test/_tags" tags
+    OS.File.write_subst "test/_tags" ["REQUIRES", requires] tags
 
   let cppo c =
     let params = [
@@ -48,12 +48,9 @@ module Build = struct
          "-build-dir" % build_dir %% of_list files)
 
   let clean os ~build_dir =
-    let ocamlbuild = Conf.tool "ocamlbuild" os in
+    OS.Cmd.run @@ Pkg.clean_cmd os ~build_dir >>= fun () ->
     OS.File.delete "pkg/META" >>= fun () ->
-    OS.File.delete "test/_tags" >>= fun () ->
-    OS.Cmd.run @@
-    Cmd.(ocamlbuild % "-use-ocamlfind" % "-classic-display" %
-         "-build-dir" % build_dir % "-clean")
+    OS.File.delete "test/_tags"
 
   let v = Pkg.build ~pre ~cmd ~clean ()
 
