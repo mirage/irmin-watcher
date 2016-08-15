@@ -1,3 +1,7 @@
+### 0.1.3
+
+- Fix `uname` runtime checks on Windows
+
 ### 0.1.2
 
 - Fix link issue when no inotify/fsevents backends are available
