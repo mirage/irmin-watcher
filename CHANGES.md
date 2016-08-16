@@ -1,3 +1,8 @@
+### 0.1.4
+
+- Use osx-fsevents > 0.2.0 to avoid an fd leak when starting/stoping
+  the main watch scheduler.
+
 ### 0.1.3
 
 - Fix `uname` runtime checks on Windows

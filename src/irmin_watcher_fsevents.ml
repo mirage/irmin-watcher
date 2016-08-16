@@ -32,7 +32,8 @@ let listen dir fn =
   let stop_scheduler () =
     (* Fsevents_lwt.flush watcher >>= fun () ->*)
     Fsevents_lwt.stop watcher;
-    Fsevents_lwt.invalidate watcher
+    Fsevents_lwt.invalidate watcher;
+    Fsevents_lwt.release watcher
   in
   fun () ->
     stop_iter ();

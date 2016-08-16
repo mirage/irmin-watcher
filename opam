@@ -16,6 +16,7 @@ depends: [
   "lwt" "logs" "fmt" "astring"
 ]
 depopts: ["inotify" "osx-fsevents"]
+conflicts: [ "osx-fsevents" {< "0.2.0"} ]
 build: [
   "ocaml" "pkg/pkg.ml" "build" "--tests" "false"
     "--pinned" pinned
