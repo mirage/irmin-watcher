@@ -74,5 +74,5 @@ let () =
     Pkg.mllib "src/irmin-watcher-polling.mllib";
     Pkg.mllib ~cond:fsevents "src/irmin-watcher-fsevents.mllib";
     Pkg.mllib ~cond:inotify "src/irmin-watcher-inotify.mllib";
-    Pkg.test "test/test";
+    Pkg.test "test/test" ~args:(Cmd.v "-v");
   ]
