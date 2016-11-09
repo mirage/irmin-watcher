@@ -15,32 +15,66 @@ let run f () =
   clean ();
   Lwt_main.run (f ())
 
-let basic_polling () =
+let rec mkdir d =
+  let perm = 0o0700 in
+  try Unix.mkdir d perm
+  with
+  | Unix.Unix_error (Unix.EEXIST, "mkdir", _) -> ()
+  | Unix.Unix_error (Unix.ENOENT, "mkdir", _) ->
+    mkdir (Filename.dirname d);
+    Unix.mkdir d perm
+
+let write f d =
+  let f = tmpdir / f in
+  mkdir (Filename.dirname f);
+  let oc = open_out f in
+  output_string oc d;
+  close_out oc
+
+let poll ~fs () =
   let events = ref [] in
   let c = Lwt_condition.create () in
+  Array.iter (fun (k, v) -> write k v) fs;
   Irmin_watcher.hook 0 tmpdir (fun x ->
       events := x :: !events;
       Lwt_condition.broadcast c x;
       Lwt.return_unit
     ) >>= fun u ->
-  let foo = tmpdir / "foo" in
-  let bar = tmpdir / "bar" in
-  let write f d =
-    let oc = open_out f in
-    output_string oc d;
-    close_out oc
-  in
-  write foo "foo";
+  write "foo" "foo";
   Lwt_condition.wait c >>= fun _ ->
   Alcotest.(check (slist string String.compare)) "foo" ["foo"] !events;
-  write bar "bar";
+  write "bar" "bar";
   Lwt_condition.wait c >>= fun _ ->
   Alcotest.(check (slist string String.compare)) "bar" ["foo";"bar"] !events;
   u ();
   Lwt.return_unit
 
+let random_letter () = Char.(chr @@ code 'a' + Random.int 26)
+
+let random_filename () =
+  Bytes.init (1 + Random.int 20) (fun _ -> random_letter ())
+  |> Bytes.to_string
+
+let random_path n =
+  let rec aux = function
+  | 0 -> []
+  | n -> random_filename () :: aux (n-1)
+  in
+  String.concat "/" (aux (n+1))
+
+let random_polls () =
+  let rec aux = function
+  | 0 -> Lwt.return_unit
+  | i ->
+      let fs = Array.init (i * 1000) (fun i -> random_path 4, string_of_int i) in
+      poll ~fs () >>= fun () ->
+      aux (i-1)
+  in
+  aux 2
+
 let polling_tests = [
-  "basic", `Quick, run basic_polling;
+  "basic", `Quick, run (poll ~fs:[||]);
+  "lots" , `Quick, run random_polls;
 ]
 
 let mode = match Irmin_watcher.mode with
