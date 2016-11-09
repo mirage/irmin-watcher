@@ -1,4 +1,4 @@
-PKG bytes topkg inotify fsevents alcotest lwt fmt logs
+PKG bytes topkg inotify alcotest lwt fmt logs
 PKG osx-fsevents.lwt inotify.lwt
 S src
 S test
