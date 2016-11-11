@@ -8,7 +8,7 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
-type t = int -> string -> (string -> unit Lwt.t) -> (unit -> unit) Lwt.t
+type t = int -> string -> (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
 (** The type for notifications hooks. A hook [f] is applied by Irmin's
     runtime by calling it with [f id dir fn], where [id] is a unique
     identifier to identify the hook in the debug messages, [dir] is
@@ -70,13 +70,13 @@ module Watchdog: sig
   val callback: t -> Callback.t
   (** [callback t] is [t]'s callback table. *)
 
-  type hook = (string -> unit Lwt.t) -> (unit -> unit) Lwt.t
+  type hook = (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
   (** The type for watchdog hook. *)
 
   val empty: unit -> t
   (** [empty ()] is the empty watchdog, monitoring no directory. *)
 
-  val clear: t -> unit
+  val clear: t -> unit Lwt.t
   (** [clear ()] stops all the currently active watchdogs. *)
 
   val start: t -> dir:string -> hook -> unit Lwt.t
@@ -84,19 +84,19 @@ module Watchdog: sig
       [dir], starting a new watchdog if needed otherwise re-using the
       previous one. *)
 
-  val stop: t -> dir:string -> unit
+  val stop: t -> dir:string -> unit Lwt.t
   (** [stop t ~dir] stops the filesystem watchdog on directory [dir]
       (if any). *)
 
 end
 
-val create: Watchdog.t -> (string -> Watchdog.hook) -> t
+val create: Watchdog.t -> (string -> Watchdog.hook) -> t Lwt.t
 (** [create t h] is the Irmin watcher using the watchdogs defined in
     [t] and the update hook [h]. *)
 
 (** {1 Helpers} *)
 
-val stoppable: (unit -> unit Lwt.t) -> (unit -> unit)
+val stoppable: (unit -> unit Lwt.t) -> (unit -> unit Lwt.t)
 (** [stoppable t] is a function [f] such that calling [f] will cancel
     the thread [t]. *)
 

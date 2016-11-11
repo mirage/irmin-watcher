@@ -44,8 +44,10 @@ module Build = struct
     let build_dir = Conf.build_dir c in
     let debug = Cmd.(on (Conf.debug c) (v "-tag" % "debug")) in
     OS.Cmd.run @@
-    Cmd.(ocamlbuild % "-use-ocamlfind" % "-classic-display" %% debug %% cppo c %
-         "-build-dir" % build_dir %% of_list files)
+    Cmd.(ocamlbuild % "-use-ocamlfind" % "-classic-display" %% debug
+         %% cppo c (* use cppo *)
+         % "-plugin-tag" % "package(ocb-stubblr)" (* ocb-stubblr plugin *)
+         % "-build-dir" % build_dir %% of_list files)
 
   let clean os ~build_dir =
     OS.Cmd.run @@ Pkg.clean_cmd os ~build_dir >>= fun () ->
@@ -69,6 +71,7 @@ let () =
   let inotify  = Conf.value c inotify in
   Ok [
     Pkg.lib ~built:false "pkg/META";
+    Pkg.clib  "src/librealpath.clib";
     Pkg.mllib "src/irmin-watcher.mllib";
     Pkg.mllib "src/irmin-watcher-core.mllib";
     Pkg.mllib "src/irmin-watcher-polling.mllib";

@@ -31,29 +31,30 @@ let write f d =
   output_string oc d;
   close_out oc
 
-let poll ~fs () =
+let poll ~fs i () =
   let events = ref [] in
   let c = Lwt_condition.create () in
   Array.iter (fun (k, v) -> write k v) fs;
-  Irmin_watcher.hook 0 tmpdir (fun x ->
+  Irmin_watcher.hook >>= fun hook ->
+  hook 0 tmpdir (fun x ->
       events := x :: !events;
       Lwt_condition.broadcast c x;
       Lwt.return_unit
     ) >>= fun u ->
-  write "foo" "foo";
+  write "foo" ("foo" ^ string_of_int i);
   Lwt_condition.wait c >>= fun _ ->
   Alcotest.(check (slist string String.compare)) "foo" ["foo"] !events;
-  write "bar" "bar";
+  write "bar" ("bar" ^ string_of_int i);
   Lwt_condition.wait c >>= fun _ ->
   Alcotest.(check (slist string String.compare)) "bar" ["foo";"bar"] !events;
-  u ();
-  Lwt.return_unit
+  u ()
 
 let random_letter () = Char.(chr @@ code 'a' + Random.int 26)
 
-let random_filename () =
+let rec random_filename () =
   Bytes.init (1 + Random.int 20) (fun _ -> random_letter ())
   |> Bytes.to_string
+  |> fun x -> if x = "foo" || x = "bar" then random_filename () else x
 
 let random_path n =
   let rec aux = function
@@ -67,13 +68,13 @@ let random_polls () =
   | 0 -> Lwt.return_unit
   | i ->
       let fs = Array.init (i * 1000) (fun i -> random_path 4, string_of_int i) in
-      poll ~fs () >>= fun () ->
+      poll ~fs i () >>= fun () ->
       aux (i-1)
   in
-  aux 2
+  aux 10
 
 let polling_tests = [
-  "basic", `Quick, run (poll ~fs:[||]);
+  "basic", `Quick, run (poll ~fs:[||] 0);
   "lots" , `Quick, run random_polls;
 ]
 

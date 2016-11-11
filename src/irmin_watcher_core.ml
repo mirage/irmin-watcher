@@ -8,18 +8,17 @@ open Astring
 open Lwt.Infix
 
 let src = Logs.Src.create "irmin-watcher" ~doc:"Irmin watcher logging"
-module Logs = (val Logs.src_log src : Logs.LOG)
+module Log = (val Logs.src_log src : Logs.LOG)
 
-type t = int -> string -> (string -> unit Lwt.t) -> (unit -> unit) Lwt.t
+type t = int -> string -> (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
 
 (* run [t] and returns an handler to stop the task. *)
 let stoppable t =
   let s, u = Lwt.task () in
   Lwt.async (fun () -> Lwt.pick ([s; t ()]));
-  function () -> Lwt.wakeup u ()
+  function () -> Lwt.wakeup u (); Lwt.return_unit
 
-let realdir dir =
-  if Filename.is_relative dir then Filename.concat (Sys.getcwd ()) dir else dir
+external realpath : string -> string = "unix_realpath"
 
 module Digests = struct
   include Set.Make(struct
@@ -48,7 +47,7 @@ module Callback = struct
   let apply t ~dir ~file =
     let fns = try Hashtbl.find t dir with Not_found -> [] in
     Lwt_list.iter_p (fun (id, f) ->
-        Logs.debug (fun f -> f "callback %d" id); f file
+        Log.debug (fun f -> f "callback %d" id); f file
       ) fns
 
   let add t ~id ~dir fn =
@@ -67,13 +66,13 @@ end
 module Watchdog = struct
 
   type t = {
-    t: (string, unit -> unit) Hashtbl.t;
+    t: (string, unit -> unit Lwt.t) Hashtbl.t;
     c: Callback.t;
   }
 
   let callback t = t.c
 
-  type hook = (string -> unit Lwt.t) -> (unit -> unit) Lwt.t
+  type hook = (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
 
   let empty (): t = {
     t = Hashtbl.create 10;
@@ -81,7 +80,8 @@ module Watchdog = struct
   }
 
   let clear { t; c } =
-    Hashtbl.iter (fun _dir stop -> stop ()) t;
+    Hashtbl.fold (fun _dir stop acc -> acc >>= stop) t Lwt.return_unit
+    >|= fun () ->
     Hashtbl.clear t;
     Callback.clear c
 
@@ -93,31 +93,34 @@ module Watchdog = struct
     | Some _ -> assert (Callback.stats c ~dir <> 0); Lwt.return_unit
     | None   ->
         (* Note: multiple threads can wait here *)
-        listen (fun file -> Callback.apply c ~dir ~file) >|= fun u ->
+        listen (fun file -> Callback.apply c ~dir ~file) >>= fun u ->
         match watchdog t dir with
         | Some _ ->
             (* Note: someone else won the race, cancel our own thread
                to avoid avoid having too many wathdogs for [dir]. *)
             u ()
         | None   ->
-            Logs.debug (fun f -> f "Start watchdog for %s" dir);
-            Hashtbl.add t dir u
+            Log.debug (fun f -> f "Start watchdog for %s" dir);
+            Hashtbl.add t dir u;
+            Lwt.return_unit
 
   let stop { t; c } ~dir =
     match watchdog t dir with
-    | None      -> assert (Callback.stats c ~dir = 0)
+    | None      ->
+        assert (Callback.stats c ~dir = 0);
+        Lwt.return_unit
     | Some stop ->
-        if Callback.stats c ~dir = 0 then (
-          Logs.debug (fun f -> f "Stop watchdog for %s" dir);
+        if Callback.stats c ~dir <> 0 then Lwt.return_unit
+        else (
+          Log.debug (fun f -> f "Stop watchdog for %s" dir);
           Hashtbl.remove t dir;
           stop ()
         )
 end
 
 let create t listen =
-  Watchdog.clear t;
   let listen_dir id dir fn =
-    let dir = realdir dir in
+    let dir = realpath dir in
     let c = Watchdog.callback t in
     Callback.add c ~id ~dir fn;
     Watchdog.start t ~dir (listen dir) >|= fun () ->
@@ -125,6 +128,7 @@ let create t listen =
       Callback.remove c ~id ~dir;
       Watchdog.stop t ~dir
   in
+  Watchdog.clear t >|= fun () ->
   listen_dir
 
 (*---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 PKG bytes topkg inotify alcotest lwt fmt logs
-PKG osx-fsevents.lwt inotify.lwt
+PKG osx-fsevents.lwt inotify.lwt ocb-stubblr
 S src
 S test
 B _build/**

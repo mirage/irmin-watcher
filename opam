@@ -13,6 +13,7 @@ depends: [
   "topkg"      {build}
   "cppo"       {build}
   "alcotest"   {test}
+  "ocb-stubblr"
   "lwt" "logs" "fmt" "astring"
 ]
 depopts: ["inotify" "osx-fsevents"]

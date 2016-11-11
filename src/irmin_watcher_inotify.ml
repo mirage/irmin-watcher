@@ -7,26 +7,27 @@
 open Lwt.Infix
 
 let src = Logs.Src.create "irw-inotify" ~doc:"Irmin watcher using Inotify"
-module Logs = (val Logs.src_log src : Logs.LOG)
+module Log = (val Logs.src_log src : Logs.LOG)
 
-let listen dir fn =
-  let path_of_event (_, _, _, p) = match p with None -> "" | Some p -> p in
-  let rec iter i =
-    Lwt_inotify.read i >>= fun e ->
-    let path = path_of_event e in
-    Logs.debug (fun l -> l "inotify: %s" path);
-    fn path;
-    iter i
-  in
+let start_watch dir =
+  Log.debug (fun l -> l "start_watch %s" dir);
   Lwt_inotify.create () >>= fun i ->
   Lwt_inotify.add_watch i dir
     [Inotify.S_Create; Inotify.S_Delete; Inotify.S_Modify]
   >|= fun u ->
-  let stop_iter = Irmin_watcher_core.stoppable (fun () -> iter i) in
-  let stop_scheduler () = Lwt_inotify.rm_watch i u in
-  fun () ->
-    stop_iter ();
-    stop_scheduler ()
+  let stop () = Lwt_inotify.rm_watch i u in
+  i, stop
+
+let listen i fn =
+  let path_of_event (_, _, _, p) = match p with None -> "" | Some p -> p in
+  let rec iter i =
+    Lwt_inotify.read i >>= fun e ->
+    let path = path_of_event e in
+    Log.debug (fun l -> l "inotify: %s" path);
+    fn path;
+    iter i
+  in
+  Irmin_watcher_core.stoppable (fun () -> iter i)
 
 let t = Irmin_watcher_core.Watchdog.empty ()
 
@@ -36,16 +37,27 @@ let t = Irmin_watcher_core.Watchdog.empty ()
    probably do better, but at the moment it is more robust to do so,
    to avoid possible duplicated events. *)
 let hook =
-  Logs.info (fun l -> l "Inotify mode");
   let open Irmin_watcher_core in
-  let wait_for_changes dir () =
-    let t, u = Lwt.task () in
-    listen dir (fun _path -> Lwt.wakeup u (); Lwt.return_unit) >>= fun u ->
-    t >>= fun () ->
-    u ()
-  in
   let listen dir f =
-    Irmin_watcher_polling.listen ~wait_for_changes:(wait_for_changes dir) ~dir f
+    Log.info (fun l -> l "Inotify mode");
+    let events = ref [] in
+    let cond = Lwt_condition.create () in
+    start_watch dir >>= fun (i, stop_watch) ->
+    let rec wait_for_changes () =
+      match List.rev !events with
+      | []   -> Lwt_condition.wait cond >>= wait_for_changes
+      | h::t -> events := List.rev t; Lwt.return (`File h)
+    in
+    let unlisten = listen i (fun path ->
+        events := path :: !events;
+        Lwt_condition.broadcast cond ();
+        Lwt.return_unit
+      ) in
+    Irmin_watcher_polling.listen ~wait_for_changes ~dir f >|= fun unpoll ->
+    fun () ->
+      stop_watch () >>= fun () ->
+      unlisten () >>= fun () ->
+      unpoll ()
   in
   create t listen
 

@@ -19,10 +19,11 @@ let dispatch pkgs =
       let flags = S[A "-pp"; A ("cppo " ^ String.concat " " flags)] in
       flag ([main_file; "ocamldep"] @ tags) flags;
       flag ([main_file; "ocaml"; "compile"] @ tags) flags
-    ) options
+    ) options;
+  flag ["file:src/irmin-watcher-core.cmxs"] (S[A"-I"; A"src"])
 
 let dispatch = function
 | After_rules -> dispatch [ ("fsevents", "FSEVENTS"); ("inotify" , "INOTIFY")]
 | _ -> ()
 
-let () = Ocamlbuild_plugin.dispatch dispatch
+let () = Ocb_stubblr.dispatchv [ Ocb_stubblr.init; dispatch ]
