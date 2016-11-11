@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2009 Anil Madhavapeddy <anil@recoil.org>
+ * Copyright (c) 2016 Thomas Gazagnaire <thomas@gazagnaire.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,11 +27,26 @@
 #include <caml/signals.h>
 #include <caml/unixsupport.h>
 
+#ifdef WIN32
+CAMLprim value unix_realpath(value path)
+{
+  TCHAR buffer[PATH_MAX]=TEXT("");
+  DWORD error = 0;
+  DWORD retval = 0;
+  retval = GetFullPathName(String_val(path), PATH_MAX, buffer, NULL);
+  if (retval == 0) {
+    error = GetLastError();
+    uerror("realpath", path);
+  };
+  return caml_copy_string(buffer);
+}
+#else
 CAMLprim value unix_realpath(value path)
 {
   char buffer[PATH_MAX];
   char *r;
   r = realpath(String_val(path), buffer);
   if (r == NULL) uerror("realpath", path);
-  return copy_string(buffer);
+  return caml_copy_string(buffer);
 }
+#endif
