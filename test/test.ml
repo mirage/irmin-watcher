@@ -33,21 +33,28 @@ let write f d =
 
 let poll ~fs i () =
   let events = ref [] in
-  let c = Lwt_condition.create () in
+  let cond = Lwt_condition.create () in
   Array.iter (fun (k, v) -> write k v) fs;
   Irmin_watcher.hook >>= fun hook ->
-  hook 0 tmpdir (fun x ->
-      events := x :: !events;
-      Lwt_condition.broadcast c x;
+  hook 0 tmpdir (fun e ->
+      events := e :: !events;
+      Lwt_condition.broadcast cond ();
       Lwt.return_unit
-    ) >>= fun u ->
+    ) >>= fun unwatch ->
+  let reset () = events := [] in
+  let rec wait () = match !events with
+  | [] -> Lwt_condition.wait cond >>= wait
+  | e  -> Lwt.return e
+  in
+  reset ();
   write "foo" ("foo" ^ string_of_int i);
-  Lwt_condition.wait c >>= fun _ ->
-  Alcotest.(check (slist string String.compare)) "foo" ["foo"] !events;
+  wait () >>= fun events ->
+  Alcotest.(check (slist string String.compare)) "foo" ["foo"] events;
+  reset ();
   write "bar" ("bar" ^ string_of_int i);
-  Lwt_condition.wait c >>= fun _ ->
-  Alcotest.(check (slist string String.compare)) "bar" ["foo";"bar"] !events;
-  u ()
+  wait () >>= fun events ->
+  Alcotest.(check (slist string String.compare)) "bar" ["bar"] events;
+  unwatch ()
 
 let random_letter () = Char.(chr @@ code 'a' + Random.int 26)
 
@@ -67,7 +74,7 @@ let random_polls () =
   let rec aux = function
   | 0 -> Lwt.return_unit
   | i ->
-      let fs = Array.init (i * 1000) (fun i -> random_path 4, string_of_int i) in
+      let fs = Array.init 1000 (fun i -> random_path 4, string_of_int i) in
       poll ~fs i () >>= fun () ->
       aux (i-1)
   in
