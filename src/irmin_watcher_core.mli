@@ -19,6 +19,9 @@ type t = int -> string -> (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
 module Digests: sig
   include Set.S with type elt = string * Digest.t
 
+  val pp_elt: elt Fmt.t
+  (** [pp_elt] is the pretty-printing function for digest elements. *)
+
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for digest sets. *)
 

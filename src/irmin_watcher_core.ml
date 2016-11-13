@@ -28,7 +28,8 @@ module Digests = struct
   let of_list l = List.fold_left (fun set elt -> add elt set) empty l
   let sdiff x y = union (diff x y) (diff y x)
   let digest_pp ppf d = Fmt.string ppf @@ Digest.to_hex d
-  let pp ppf t = Fmt.(Dump.list (Dump.pair string digest_pp)) ppf @@ elements t
+  let pp_elt = Fmt.(Dump.pair string digest_pp)
+  let pp ppf t = Fmt.(Dump.list pp_elt) ppf @@ elements t
   let files t =
     elements t |> List.map fst |> String.Set.of_list |> String.Set.elements
 end
