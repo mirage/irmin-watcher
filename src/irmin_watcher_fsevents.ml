@@ -63,7 +63,7 @@ let hook =
     let unlisten =
       listen stream (fun path ->
           events := path :: !events;
-          Lwt_condition.broadcast cond ();
+          Lwt_condition.signal cond ();
           Lwt.return_unit
         ) in
     Irmin_watcher_polling.listen ~wait_for_changes ~dir f >|= fun unpoll ->

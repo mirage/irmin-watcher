@@ -12,18 +12,26 @@ module Log = (val Logs.src_log src : Logs.LOG)
 let start_watch dir =
   Log.debug (fun l -> l "start_watch %s" dir);
   Lwt_inotify.create () >>= fun i ->
-  Lwt_inotify.add_watch i dir
-    [Inotify.S_Create; Inotify.S_Delete; Inotify.S_Modify]
-  >|= fun u ->
+  Lwt_inotify.add_watch i dir [
+    Inotify.S_Create;
+    Inotify.S_Modify;
+    Inotify.S_Delete;
+  ]  >|= fun u ->
   let stop () = Lwt_inotify.rm_watch i u in
   i, stop
 
-let listen i fn =
-  let path_of_event (_, _, _, p) = match p with None -> "" | Some p -> p in
+let listen dir i fn =
+  let event_kinds (_, es, _, _) = es in
+  let pp_kind = Fmt.of_to_string Inotify.string_of_event_kind in
+  let path_of_event (_, _, _, p) = match p with
+  | None   -> dir
+  | Some p -> Filename.concat dir p
+  in
   let rec iter i =
     Lwt_inotify.read i >>= fun e ->
     let path = path_of_event e in
-    Log.debug (fun l -> l "inotify: %s" path);
+    let es = event_kinds e in
+    Log.debug (fun l -> l "inotify: %s %a" path Fmt.(Dump.list pp_kind) es);
     fn path;
     iter i
   in
@@ -48,9 +56,9 @@ let hook =
       | []   -> Lwt_condition.wait cond >>= wait_for_changes
       | h::t -> events := List.rev t; Lwt.return (`File h)
     in
-    let unlisten = listen i (fun path ->
+    let unlisten = listen dir i (fun path ->
         events := path :: !events;
-        Lwt_condition.broadcast cond ();
+        Lwt_condition.signal cond ();
         Lwt.return_unit
       ) in
     Irmin_watcher_polling.listen ~wait_for_changes ~dir f >|= fun unpoll ->
