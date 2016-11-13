@@ -31,10 +31,13 @@ let write f d =
   output_string oc d;
   close_out oc
 
-let poll ~fs i () =
+let remove f =
+  try Unix.unlink (tmpdir / f)
+  with e -> Alcotest.fail @@ Printexc.to_string e
+
+let poll i () =
   let events = ref [] in
   let cond = Lwt_condition.create () in
-  Array.iter (fun (k, v) -> write k v) fs;
   Irmin_watcher.hook >>= fun hook ->
   hook 0 tmpdir (fun e ->
       events := e :: !events;
@@ -44,13 +47,21 @@ let poll ~fs i () =
   let reset () = events := [] in
   let rec wait () = match !events with
   | [] -> Lwt_condition.wait cond >>= wait
-  | e  -> Lwt.return e
+  | e  -> reset (); Lwt.return e
   in
-  reset ();
+
   write "foo" ("foo" ^ string_of_int i);
   wait () >>= fun events ->
-  Alcotest.(check (slist string String.compare)) "foo" ["foo"] events;
-  reset ();
+  Alcotest.(check (slist string String.compare)) "updte foo" ["foo"] events;
+
+  remove "foo";
+  wait () >>= fun events ->
+  Alcotest.(check (slist string String.compare)) "remove foo" ["foo"] events;
+
+  write "foo" ("foo" ^ string_of_int i);
+  wait () >>= fun events ->
+  Alcotest.(check (slist string String.compare)) "create foo" ["foo"] events;
+
   write "bar" ("bar" ^ string_of_int i);
   wait () >>= fun events ->
   Alcotest.(check (slist string String.compare)) "bar" ["bar"] events;
@@ -70,19 +81,24 @@ let random_path n =
   in
   String.concat "/" (aux (n+1))
 
-let random_polls () =
+let prepare_fs n =
+  let fs = Array.init n (fun i -> random_path 4, string_of_int i) in
+  Array.iter (fun (k, v) -> write k v) fs
+
+let random_polls n () =
   let rec aux = function
   | 0 -> Lwt.return_unit
   | i ->
-      let fs = Array.init 1000 (fun i -> random_path 4, string_of_int i) in
-      poll ~fs i () >>= fun () ->
+      poll i () >>= fun () ->
       aux (i-1)
   in
-  aux 10
+  prepare_fs n;
+  aux 100
 
 let polling_tests = [
-  "basic", `Quick, run (poll ~fs:[||] 0);
-  "lots" , `Quick, run random_polls;
+  "basic"  , `Quick, run (poll 0);
+  "100s"   , `Quick, run (random_polls 100);
+  "1000s"  , `Quick, run (random_polls 1000);
 ]
 
 let mode = match Irmin_watcher.mode with
