@@ -93,7 +93,9 @@ let random_polls n () =
       aux (i-1)
   in
   prepare_fs n;
-  aux 100
+  match Irmin_watcher.mode with
+  | `Polling -> aux 10
+  | _        -> aux 100
 
 let polling_tests = [
   "basic"  , `Quick, run (poll 0);
