@@ -41,15 +41,12 @@ let listen stream fn =
   in
   Irmin_watcher_core.stoppable iter
 
-let t = Irmin_watcher_core.Watchdog.empty ()
-
 (* Note: we use FSevents to detect any change, and we re-read the full
    tree on every change (so very similar to active polling, but
    blocking on incoming FSevents instead of sleeping). We could
    probably do better, but at the moment it is more robust to do so,
    to avoid possible duplicated events. *)
-let hook =
-  let open Irmin_watcher_core in
+let v =
   let listen dir f =
     Log.info (fun l -> l "FSevents mode");
     let events = ref [] in
@@ -72,7 +69,7 @@ let hook =
       unlisten () >>= fun () ->
       unpoll ()
   in
-  create t listen
+  Irmin_watcher_core.create listen
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

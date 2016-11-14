@@ -8,13 +8,6 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
-type t = int -> string -> (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
-(** The type for notifications hooks. A hook [f] is applied by Irmin's
-    runtime by calling it with [f id dir fn], where [id] is a unique
-    identifier to identify the hook in the debug messages, [dir] is
-    the directory to watch for changes and [f] is the callback to
-    apply on every path changes. *)
-
 (** Sets of filenames and their digests. *)
 module Digests: sig
   include Set.S with type elt = string * Digest.t
@@ -33,16 +26,16 @@ module Digests: sig
 end
 
 (** Dispatch listening functions. *)
-module Callback: sig
+module Dispatch: sig
 
   type t
-  (** The type for callback tables. *)
+  (** The type for callback dispatches. *)
 
   val empty: unit -> t
-  (** [create ()] is the empty callback table. *)
+  (** [create ()] is the empty dispatch table. *)
 
   val clear: t -> unit
-  (** [clear t] clears the contents of the callback table [t]. All
+  (** [clear t] clears the contents of the dispatch table [t]. All
       previous callbacks are discarded. *)
 
   val stats: t -> dir:string -> int
@@ -61,6 +54,9 @@ module Callback: sig
   (** [remove t ~id ~dir] removes the callback with ID [id] on the
       directory [dir]. *)
 
+  val length: t -> int
+  (** [length t] is [t]'s length. *)
+
 end
 
 (** Watchdog functions. Ensure that only one background process is
@@ -70,8 +66,8 @@ module Watchdog: sig
   type t
   (** The type for filesystem watchdogs. *)
 
-  val callback: t -> Callback.t
-  (** [callback t] is [t]'s callback table. *)
+  val dispatch: t -> Dispatch.t
+  (** [dispath t] is the table of [t]'s callback dispatch. *)
 
   type hook = (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
   (** The type for watchdog hook. *)
@@ -91,11 +87,25 @@ module Watchdog: sig
   (** [stop t ~dir] stops the filesystem watchdog on directory [dir]
       (if any). *)
 
+  val length: t -> int
+  (** [length t] is the number of watchdog threads. *)
+
 end
 
-val create: Watchdog.t -> (string -> Watchdog.hook) -> t Lwt.t
-(** [create t h] is the Irmin watcher using the watchdogs defined in
-    [t] and the update hook [h]. *)
+type hook = int -> string -> (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
+(** The type for Irmin.Watch hooks. *)
+
+type t
+(** The type for listeners. *)
+
+val create: (string -> Watchdog.hook) -> t
+(** [create h] is the Irmin watcher using the update hook [h]. *)
+
+val watchdog: t -> Watchdog.t
+(** [watchdog t] is [t]'s watchdog. *)
+
+val hook: t -> hook
+(** [hook t] is [t]'s hook. *)
 
 (** {1 Helpers} *)
 

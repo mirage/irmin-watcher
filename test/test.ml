@@ -38,8 +38,7 @@ let remove f =
 let poll i () =
   let events = ref [] in
   let cond = Lwt_condition.create () in
-  Irmin_watcher.hook >>= fun hook ->
-  hook 0 tmpdir (fun e ->
+  Irmin_watcher.hook 0 tmpdir (fun e ->
       events := e :: !events;
       Lwt_condition.broadcast cond ();
       Lwt.return_unit

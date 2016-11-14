@@ -10,8 +10,6 @@ open Lwt.Infix
 let src = Logs.Src.create "irmin-watcher" ~doc:"Irmin watcher logging"
 module Log = (val Logs.src_log src : Logs.LOG)
 
-type t = int -> string -> (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
-
 (* run [t] and returns an handler to stop the task. *)
 let stoppable t =
   let s, u = Lwt.task () in
@@ -34,7 +32,7 @@ module Digests = struct
     elements t |> List.map fst |> String.Set.of_list |> String.Set.elements
 end
 
-module Callback = struct
+module Dispatch = struct
 
   type t = (string, (int * (string -> unit Lwt.t)) list) Hashtbl.t
 
@@ -62,39 +60,42 @@ module Callback = struct
     if fns = [] then Hashtbl.remove t dir
     else Hashtbl.replace t dir fns
 
+  let length t = Hashtbl.fold (fun _ v acc -> acc + List.length v) t 0
+
 end
 
 module Watchdog = struct
 
   type t = {
     t: (string, unit -> unit Lwt.t) Hashtbl.t;
-    c: Callback.t;
+    d: Dispatch.t;
   }
 
-  let callback t = t.c
+  let length t = Hashtbl.length t.t
+  let dispatch t = t.d
 
   type hook = (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
 
   let empty (): t = {
     t = Hashtbl.create 10;
-    c = Callback.empty ();
+    d = Dispatch.empty ();
   }
 
-  let clear { t; c } =
+  let clear { t; d } =
     Hashtbl.fold (fun _dir stop acc -> acc >>= stop) t Lwt.return_unit
     >|= fun () ->
     Hashtbl.clear t;
-    Callback.clear c
+    Dispatch.clear d
 
   let watchdog t dir =
     try Some (Hashtbl.find t dir) with Not_found -> None
 
-  let start { t; c } ~dir listen =
+  let start { t; d } ~dir listen =
     match watchdog t dir with
-    | Some _ -> assert (Callback.stats c ~dir <> 0); Lwt.return_unit
+    | Some _ -> assert (Dispatch.stats d ~dir <> 0); Lwt.return_unit
     | None   ->
         (* Note: multiple threads can wait here *)
-        listen (fun file -> Callback.apply c ~dir ~file) >>= fun u ->
+        listen (fun file -> Dispatch.apply d ~dir ~file) >>= fun u ->
         match watchdog t dir with
         | Some _ ->
             (* Note: someone else won the race, cancel our own thread
@@ -105,13 +106,13 @@ module Watchdog = struct
             Hashtbl.add t dir u;
             Lwt.return_unit
 
-  let stop { t; c } ~dir =
+  let stop { t; d } ~dir =
     match watchdog t dir with
     | None      ->
-        assert (Callback.stats c ~dir = 0);
+        assert (Dispatch.stats d ~dir = 0);
         Lwt.return_unit
     | Some stop ->
-        if Callback.stats c ~dir <> 0 then Lwt.return_unit
+        if Dispatch.stats d ~dir <> 0 then Lwt.return_unit
         else (
           Log.debug (fun f -> f "Stop watchdog for %s" dir);
           Hashtbl.remove t dir;
@@ -119,18 +120,40 @@ module Watchdog = struct
         )
 end
 
-let create t listen =
-  let listen_dir id dir fn =
+type hook = int -> string -> (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
+
+type t = {
+  mutable listen: int -> string -> (string -> unit Lwt.t) -> unit Lwt.t;
+  mutable stop  : unit -> unit Lwt.t;
+  watchdog      : Watchdog.t;
+}
+
+let watchdog t = t.watchdog
+
+let hook t id dir f =
+  t.listen id dir f >|= fun () ->
+  t.stop
+
+let create listen =
+  let watchdog = Watchdog.empty () in
+  let t = {
+    listen = (fun _ _ _ -> Lwt.return_unit);
+    stop   = (fun _ -> Lwt.return_unit);
+    watchdog;
+  } in
+  let listen id dir fn =
     let dir = realpath dir in
-    let c = Watchdog.callback t in
-    Callback.add c ~id ~dir fn;
-    Watchdog.start t ~dir (listen dir) >|= fun () ->
-    function () ->
-      Callback.remove c ~id ~dir;
-      Watchdog.stop t ~dir
+    let d = Watchdog.dispatch watchdog in
+    Dispatch.add d ~id ~dir fn;
+    Watchdog.start watchdog ~dir (listen dir) >|= fun () ->
+    let stop () =
+      Dispatch.remove d ~id ~dir;
+      Watchdog.stop watchdog ~dir
+    in
+    t.stop <- stop
   in
-  Watchdog.clear t >|= fun () ->
-  listen_dir
+  t.listen <- listen;
+  t
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
