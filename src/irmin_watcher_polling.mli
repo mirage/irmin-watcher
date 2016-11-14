@@ -10,12 +10,16 @@
 
 open Irmin_watcher_core
 
-val hook: float -> t
+val hook: float -> t Lwt.t
 (** [hook delay id p f] is the hook calling [f] everytime a sub-path
     of [p] is modified. Return a function to call to remove the
     hook. Active polling is done every [delay] seconds. *)
 
-val listen: wait_for_changes:(unit -> unit Lwt.t) -> dir:string -> Watchdog.hook
+type event = [ `Unknown | `File of string ]
+(** The type for change event. *)
+
+val listen: wait_for_changes:(unit -> event Lwt.t) -> dir:string ->
+  Watchdog.hook
 (** [listen ~wait_for_changes ~dir] is the watchdog hook using
     [wait_for_changes] to detect filesystem updates in the directory
     [dir]. The polling implemention just calls [Lwt_unix.sleep]. *)

@@ -16,17 +16,17 @@ let uname () =
 let _is_linux () =
   Sys.os_type = "Unix" && uname () = Some "Linux"
 
-let hook id dir fn =
+let hook =
 #ifdef HAVE_FSEVENTS
   let _ = uname in
-  Irmin_watcher_fsevents.hook id dir fn
+  Irmin_watcher_fsevents.hook
 #elif defined HAVE_INOTIFY
   if _is_linux () then
-    Irmin_watcher_inotify.hook id dir fn
+    Irmin_watcher_inotify.hook
   else
-    Irmin_watcher_polling.(hook !default_polling_time) id dir fn
+    Irmin_watcher_polling.(hook !default_polling_time)
 #else
-  Irmin_watcher_polling.(hook !default_polling_time) id dir fn
+  Irmin_watcher_polling.(hook !default_polling_time)
 #endif
 
 let mode =

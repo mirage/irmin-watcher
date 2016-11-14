@@ -5,7 +5,7 @@ INOTIFY=$(shell opam config var inotify:installed)
 
 all:
 	ocaml pkg/pkg.ml build \
-	  --with-fsevents $(FSEVENTS) --with-inotify $(INOTIFY)
+	  --with-fsevents $(FSEVENTS) --with-inotify $(INOTIFY) --tests true
 
 test:
 	ocaml pkg/pkg.ml build --tests true \

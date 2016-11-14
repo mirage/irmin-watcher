@@ -1,10 +1,12 @@
 true: bin_annot, safe_string, package(bytes)
 true: warn_error(+1..49), warn(A-4-41-44)
 
-true: package(lwt), package(logs), package(fmt), package(astring)
+true: package(lwt logs fmt astring)
 
 <src> : include
 <src/irmin_watcher_fsevents.*>: package(osx-fsevents.lwt), thread
 <src/irmin_watcher_inotify.*>: package(inotify.lwt)
 
-<test/*>: package(alcotest), package(lwt.unix), package(logs.fmt)
+<src/irmin-watcher-core.cm{,x}a>: link_stubs(src/librealpath)
+
+<test/*>: package(alcotest lwt.unix logs.fmt mtime.os), use_irmin-watcher-core
