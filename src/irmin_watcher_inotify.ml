@@ -17,7 +17,10 @@ let start_watch dir =
     Inotify.S_Modify;
     Inotify.S_Delete;
   ]  >|= fun u ->
-  let stop () = Lwt_inotify.rm_watch i u in
+  let stop () =
+    Lwt_inotify.rm_watch i u >>= fun () ->
+    Lwt_inotify.close i
+  in
   i, stop
 
 let listen dir i fn =
@@ -28,12 +31,17 @@ let listen dir i fn =
   | Some p -> Filename.concat dir p
   in
   let rec iter i =
-    Lwt_inotify.read i >>= fun e ->
-    let path = path_of_event e in
-    let es = event_kinds e in
-    Log.debug (fun l -> l "inotify: %s %a" path Fmt.(Dump.list pp_kind) es);
-    fn path;
-    iter i
+    Lwt.catch (fun () ->
+        Lwt_inotify.read i >>= fun e ->
+        let path = path_of_event e in
+        let es = event_kinds e in
+        Log.debug (fun l -> l "inotify: %s %a" path Fmt.(Dump.list pp_kind) es);
+        fn path;
+        iter i
+      ) (function
+      | Unix.Unix_error (Unix.EBADF, _, _) ->
+          Lwt.return_unit (* i has just been closed by {!stop} *)
+      | e -> Lwt.fail e)
   in
   Irmin_watcher_core.stoppable (fun () -> iter i)
 
