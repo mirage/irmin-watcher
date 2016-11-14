@@ -63,8 +63,10 @@ let rec poll ~callback ~wait_for_changes dir files (event:event) =
   ( match event with
   | `Unknown -> read_files dir
   | `File f  ->
-      let files = Digests.filter (fun (x, _) -> x <> f) files in
-      match read_file ~prefix:(dir / "") f with
+      let prefix = dir / "" in
+      let short_f = String.with_range ~first:(String.length prefix) f in
+      let files = Digests.filter (fun (x, _) -> x <> short_f) files in
+      match read_file ~prefix f with
       | None   -> Lwt.return files
       | Some d -> Lwt.return (Digests.add d files)
   ) >>= fun new_files ->
