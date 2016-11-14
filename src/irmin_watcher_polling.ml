@@ -89,12 +89,10 @@ let listen ~wait_for_changes ~dir callback =
 
 let default_polling_time = ref 1.
 
-let hook delay =
+let v delay =
   Log.info (fun l -> l "Polling mode");
-  let open Irmin_watcher_core in
   let wait_for_changes () = Lwt_unix.sleep delay >|= fun () -> `Unknown in
-  let t = Watchdog.empty () in
-  create t (fun dir -> listen ~wait_for_changes ~dir)
+  Irmin_watcher_core.create (fun dir -> listen ~wait_for_changes ~dir)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

@@ -8,9 +8,9 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
-val hook: Irmin_watcher_core.t Lwt.t
-(** [hook id p f] is the hook calling [f] everytime a sub-path of [p]
-    is modified. Return a function to call to remove the hook. Use the
+val v: Irmin_watcher_core.t
+(** [v id p f] is the hook calling [f] everytime a sub-path of [p] is
+    modified. Return a function to call to remove the hook. Use the
     FSevent framework to be notified on filesystem changes. *)
 
 (*---------------------------------------------------------------------------

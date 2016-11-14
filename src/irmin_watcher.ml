@@ -16,17 +16,17 @@ let uname () =
 let _is_linux () =
   Sys.os_type = "Unix" && uname () = Some "Linux"
 
-let hook =
+let v =
 #ifdef HAVE_FSEVENTS
   let _ = uname in
-  Irmin_watcher_fsevents.hook
+  Irmin_watcher_fsevents.v
 #elif defined HAVE_INOTIFY
   if _is_linux () then
-    Irmin_watcher_inotify.hook
+    Irmin_watcher_inotify.v
   else
-    Irmin_watcher_polling.(hook !default_polling_time)
+    Irmin_watcher_polling.(v !default_polling_time)
 #else
-  Irmin_watcher_polling.(hook !default_polling_time)
+  Irmin_watcher_polling.(v !default_polling_time)
 #endif
 
 let mode =
@@ -37,6 +37,19 @@ let mode =
 #else
   `Polling
 #endif
+
+let hook = Irmin_watcher_core.hook v
+
+type stats = {
+  watchdogs : int;
+  dispatches: int;
+}
+
+let stats () =
+  let w = Irmin_watcher_core.watchdog v in
+  let d = Irmin_watcher_core.Watchdog.dispatch w in
+  { watchdogs  = Irmin_watcher_core.Watchdog.length w;
+    dispatches = Irmin_watcher_core.Dispatch.length d }
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

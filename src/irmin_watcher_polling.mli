@@ -10,9 +10,9 @@
 
 open Irmin_watcher_core
 
-val hook: float -> t Lwt.t
-(** [hook delay id p f] is the hook calling [f] everytime a sub-path
-    of [p] is modified. Return a function to call to remove the
+val v: float -> t
+(** [v delay id p f] is the hook calling [f] everytime a sub-path of
+    [p] is modified. Return a function to call to remove the
     hook. Active polling is done every [delay] seconds. *)
 
 type event = [ `Unknown | `File of string ]

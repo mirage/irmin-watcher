@@ -45,15 +45,12 @@ let listen dir i fn =
   in
   Irmin_watcher_core.stoppable (fun () -> iter i)
 
-let t = Irmin_watcher_core.Watchdog.empty ()
-
 (* Note: we use Inotify to detect any change, and we re-read the full
    tree on every change (so very similar to active polling, but
    blocking on incoming Inotify events instead of sleeping). We could
    probably do better, but at the moment it is more robust to do so,
    to avoid possible duplicated events. *)
-let hook =
-  let open Irmin_watcher_core in
+let v =
   let listen dir f =
     Log.info (fun l -> l "Inotify mode");
     let events = ref [] in
@@ -75,7 +72,7 @@ let hook =
       unlisten () >>= fun () ->
       unpoll ()
   in
-  create t listen
+  Irmin_watcher_core.create listen
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
