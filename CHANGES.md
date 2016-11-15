@@ -1,5 +1,6 @@
 ### 0.2.0 (2016-11-14)
 
+- Allow to watch non-existing directories (#8, @samoht)
 - Expose `Irmin_watches.stats` to get stats about the numbers
   of active watchdogs, and callback dispatchers (#7, @samoht)
 - When using fsevents/inotify do not scan the whole tree everytime

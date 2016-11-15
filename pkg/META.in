@@ -20,7 +20,7 @@ package "core" (
 package "polling" (
   description = "Polling backend for Irmin watchers"
   version = "%%VERSION%%"
-  requires = "irmin-watcher.core lwt astring"
+  requires = "irmin-watcher.core lwt.unix astring"
   archive(byte) = "irmin-watcher-polling.cma"
   archive(native) = "irmin-watcher-polling.cmxa"
   plugin(byte) = "irmin-watcher-polling.cma"

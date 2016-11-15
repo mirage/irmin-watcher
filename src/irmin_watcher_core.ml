@@ -16,7 +16,20 @@ let stoppable t =
   Lwt.async (fun () -> Lwt.pick ([s; t ()]));
   function () -> Lwt.wakeup u (); Lwt.return_unit
 
-external realpath : string -> string = "unix_realpath"
+external unix_realpath : string -> string = "unix_realpath"
+
+let realpath dir =
+  let (/) x y = match y with
+  | None   -> x
+  | Some y -> Filename.concat x y
+  in
+  let rec aux dir file =
+    try unix_realpath dir / file
+    with Unix.Unix_error (Unix.ENOENT, _, _) ->
+      let file = Filename.basename dir / file in
+      aux (Filename.dirname dir) (Some file)
+  in
+  aux dir None
 
 module Digests = struct
   include Set.Make(struct

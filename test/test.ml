@@ -8,8 +8,7 @@ let clean () =
   if Sys.file_exists tmpdir then (
     let _ = Sys.command (Printf.sprintf "rm -rf '%s'" tmpdir) in
     ()
-  );
-  Unix.mkdir tmpdir 0o755
+  )
 
 let run f () =
   clean ();
@@ -35,7 +34,8 @@ let remove f =
   try Unix.unlink (tmpdir / f)
   with e -> Alcotest.fail @@ Printexc.to_string e
 
-let poll i () =
+let poll ~mkdir:m i () =
+  if m then mkdir tmpdir;
   let events = ref [] in
   let cond = Lwt_condition.create () in
   Irmin_watcher.hook 0 tmpdir (fun e ->
@@ -85,10 +85,11 @@ let prepare_fs n =
   Array.iter (fun (k, v) -> write k v) fs
 
 let random_polls n () =
+  mkdir tmpdir;
   let rec aux = function
   | 0 -> Lwt.return_unit
   | i ->
-      poll i () >>= fun () ->
+      poll ~mkdir:false i () >>= fun () ->
       aux (i-1)
   in
   prepare_fs n;
@@ -97,7 +98,8 @@ let random_polls n () =
   | _        -> aux 100
 
 let polling_tests = [
-  "basic"  , `Quick, run (poll 0);
+  "enoent" , `Quick, run (poll ~mkdir:false 0);
+  "basic"  , `Quick, run (poll ~mkdir:true 0);
   "100s"   , `Quick, run (random_polls 100);
   "1000s"  , `Quick, run (random_polls 1000);
 ]
