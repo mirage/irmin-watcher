@@ -9,8 +9,18 @@ open Lwt.Infix
 let src = Logs.Src.create "irw-inotify" ~doc:"Irmin watcher using Inotify"
 module Log = (val Logs.src_log src : Logs.LOG)
 
+let rec mkdir d =
+  let perm = 0o0700 in
+  try Unix.mkdir d perm
+  with
+  | Unix.Unix_error (Unix.EEXIST, "mkdir", _) -> ()
+  | Unix.Unix_error (Unix.ENOENT, "mkdir", _) ->
+    mkdir (Filename.dirname d);
+    Unix.mkdir d perm
+
 let start_watch dir =
   Log.debug (fun l -> l "start_watch %s" dir);
+  if not (Sys.file_exists dir) then mkdir dir;
   Lwt_inotify.create () >>= fun i ->
   Lwt_inotify.add_watch i dir [
     Inotify.S_Create;
