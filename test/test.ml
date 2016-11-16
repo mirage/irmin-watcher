@@ -30,6 +30,8 @@ let write f d =
   output_string oc d;
   close_out oc
 
+let move a b = Unix.rename (tmpdir / a) (tmpdir / b)
+
 let remove f =
   try Unix.unlink (tmpdir / f)
   with e -> Alcotest.fail @@ Printexc.to_string e
@@ -44,9 +46,13 @@ let poll ~mkdir:m i () =
       Lwt.return_unit
     ) >>= fun unwatch ->
   let reset () = events := [] in
-  let rec wait () = match !events with
-  | [] -> Lwt_condition.wait cond >>= wait
-  | e  -> reset (); Lwt.return e
+  let rec wait ?n () = match !events with
+  | [] -> Lwt_condition.wait cond >>= fun () -> wait ?n ()
+  | e  -> match n with
+  | None   -> reset (); Lwt.return e
+  | Some n ->
+      if List.length e < n then Lwt_condition.wait cond >>= wait ~n
+      else (reset (); Lwt.return e)
   in
 
   write "foo" ("foo" ^ string_of_int i);
@@ -63,7 +69,12 @@ let poll ~mkdir:m i () =
 
   write "bar" ("bar" ^ string_of_int i);
   wait () >>= fun events ->
-  Alcotest.(check (slist string String.compare)) "bar" ["bar"] events;
+  Alcotest.(check (slist string String.compare)) "create bar" ["bar"] events;
+
+  move "bar" "barx";
+  wait ~n:2 () >>= fun events ->
+  Alcotest.(check (slist string String.compare)) "move bar" ["bar"; "barx"] events;
+
   unwatch ()
 
 let random_letter () = Char.(chr @@ code 'a' + Random.int 26)
