@@ -25,6 +25,7 @@ let start_watch dir =
   Lwt_inotify.add_watch i dir [
     Inotify.S_Create;
     Inotify.S_Modify;
+    Inotify.S_Move;
     Inotify.S_Delete;
   ]  >|= fun u ->
   let stop () =

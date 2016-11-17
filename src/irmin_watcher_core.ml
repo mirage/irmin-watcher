@@ -125,8 +125,10 @@ module Watchdog = struct
         assert (Dispatch.stats d ~dir = 0);
         Lwt.return_unit
     | Some stop ->
-        if Dispatch.stats d ~dir <> 0 then Lwt.return_unit
-        else (
+        if Dispatch.stats d ~dir <> 0 then (
+          Log.debug (fun f -> f "Active allback are registered for %s" dir);
+          Lwt.return_unit
+        ) else (
           Log.debug (fun f -> f "Stop watchdog for %s" dir);
           Hashtbl.remove t dir;
           stop ()
