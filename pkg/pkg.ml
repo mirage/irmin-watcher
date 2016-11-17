@@ -59,7 +59,7 @@ module Build = struct
 end
 
 let opams =
-  let lint_deps_excluding = Some ["cppo"] in
+  let lint_deps_excluding = Some ["cppo"; "ocb-stubblr"] in
   [Pkg.opam_file ~lint_deps_excluding "opam"]
 
 let metas = [Pkg.meta_file ~install:false "pkg/META.in"]
