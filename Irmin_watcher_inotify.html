@@ -25,13 +25,13 @@
 Inotify backend for Irmin watchers.
 <p>
 
-    <em>0.1.4 — <a href="https://github.com/samoht/irmin-watcher ">homepage</a></em><br>
+    <em>0.1.4-30-gdddc9f5 — <a href="https://github.com/samoht/irmin-watcher ">homepage</a></em><br>
 </div>
 <hr width="100%">
 
-<pre><span id="VALhook"><span class="keyword">val</span> hook</span> : <code class="type"><a href="Irmin_watcher_core.html#TYPEt">Irmin_watcher_core.t</a></code></pre><div class="info ">
-<code class="code">hook id p f</code> is the hook calling <code class="code">f</code> everytime a sub-path of <code class="code">p</code>
-    is modified. Return a function to call to remove the hook. Use
+<pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type"><a href="Irmin_watcher_core.html#TYPEt">Irmin_watcher_core.t</a></code></pre><div class="info ">
+<code class="code">v id p f</code> is the hook calling <code class="code">f</code> everytime a sub-path of <code class="code">p</code> is
+    modified. Return a function to call to remove the hook. Use
     inofity to be notified on filesystem changes.<br>
 </div>
 </body></html>

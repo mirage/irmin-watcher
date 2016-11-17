@@ -18,38 +18,32 @@
 <h1>Index of values</h1>
 <table>
 <tr><td align="left"><br>A</td></tr>
-<tr><td><a href="Irmin_watcher_core.Callback.html#VALadd">add</a> [<a href="Irmin_watcher_core.Callback.html">Irmin_watcher_core.Callback</a>]</td>
+<tr><td><a href="Irmin_watcher_core.Dispatch.html#VALadd">add</a> [<a href="Irmin_watcher_core.Dispatch.html">Irmin_watcher_core.Dispatch</a>]</td>
 <td><div class="info">
 <code class="code">add t ~id ~dir f</code> adds a new callback <code class="code">f</code> to the directory
       <code class="code">dir</code>, using the unique identifier <code class="code">id</code>.
 </div>
 </td></tr>
-<tr><td><a href="Irmin_watcher_core.Callback.html#VALapply">apply</a> [<a href="Irmin_watcher_core.Callback.html">Irmin_watcher_core.Callback</a>]</td>
+<tr><td><a href="Irmin_watcher_core.Dispatch.html#VALapply">apply</a> [<a href="Irmin_watcher_core.Dispatch.html">Irmin_watcher_core.Dispatch</a>]</td>
 <td><div class="info">
 <code class="code">apply t ~dir ~file</code> calls <code class="code">f file</code> for every callback <code class="code">f</code>
       registered for the directory <code class="code">dir</code>.
 </div>
 </td></tr>
 <tr><td align="left"><br>C</td></tr>
-<tr><td><a href="Irmin_watcher_core.Watchdog.html#VALcallback">callback</a> [<a href="Irmin_watcher_core.Watchdog.html">Irmin_watcher_core.Watchdog</a>]</td>
-<td><div class="info">
-<code class="code">callback t</code> is <code class="code">t</code>'s callback table.
-</div>
-</td></tr>
 <tr><td><a href="Irmin_watcher_core.Watchdog.html#VALclear">clear</a> [<a href="Irmin_watcher_core.Watchdog.html">Irmin_watcher_core.Watchdog</a>]</td>
 <td><div class="info">
 <code class="code">clear ()</code> stops all the currently active watchdogs.
 </div>
 </td></tr>
-<tr><td><a href="Irmin_watcher_core.Callback.html#VALclear">clear</a> [<a href="Irmin_watcher_core.Callback.html">Irmin_watcher_core.Callback</a>]</td>
+<tr><td><a href="Irmin_watcher_core.Dispatch.html#VALclear">clear</a> [<a href="Irmin_watcher_core.Dispatch.html">Irmin_watcher_core.Dispatch</a>]</td>
 <td><div class="info">
-<code class="code">clear t</code> clears the contents of the callback table <code class="code">t</code>.
+<code class="code">clear t</code> clears the contents of the dispatch table <code class="code">t</code>.
 </div>
 </td></tr>
 <tr><td><a href="Irmin_watcher_core.html#VALcreate">create</a> [<a href="Irmin_watcher_core.html">Irmin_watcher_core</a>]</td>
 <td><div class="info">
-<code class="code">create t h</code> is the Irmin watcher using the watchdogs defined in
-    <code class="code">t</code> and the update hook <code class="code">h</code>.
+<code class="code">create h</code> is the Irmin watcher using the update hook <code class="code">h</code>.
 </div>
 </td></tr>
 <tr><td align="left"><br>D</td></tr>
@@ -58,15 +52,20 @@
 The default interval for active polling, in seconds.
 </div>
 </td></tr>
+<tr><td><a href="Irmin_watcher_core.Watchdog.html#VALdispatch">dispatch</a> [<a href="Irmin_watcher_core.Watchdog.html">Irmin_watcher_core.Watchdog</a>]</td>
+<td><div class="info">
+<code class="code">dispath t</code> is the table of <code class="code">t</code>'s callback dispatch.
+</div>
+</td></tr>
 <tr><td align="left"><br>E</td></tr>
 <tr><td><a href="Irmin_watcher_core.Watchdog.html#VALempty">empty</a> [<a href="Irmin_watcher_core.Watchdog.html">Irmin_watcher_core.Watchdog</a>]</td>
 <td><div class="info">
 <code class="code">empty ()</code> is the empty watchdog, monitoring no directory.
 </div>
 </td></tr>
-<tr><td><a href="Irmin_watcher_core.Callback.html#VALempty">empty</a> [<a href="Irmin_watcher_core.Callback.html">Irmin_watcher_core.Callback</a>]</td>
+<tr><td><a href="Irmin_watcher_core.Dispatch.html#VALempty">empty</a> [<a href="Irmin_watcher_core.Dispatch.html">Irmin_watcher_core.Dispatch</a>]</td>
 <td><div class="info">
-<code class="code">create ()</code> is the empty callback table.
+<code class="code">create ()</code> is the empty dispatch table.
 </div>
 </td></tr>
 <tr><td align="left"><br>F</td></tr>
@@ -76,31 +75,27 @@ The default interval for active polling, in seconds.
 </div>
 </td></tr>
 <tr><td align="left"><br>H</td></tr>
-<tr><td><a href="Irmin_watcher_inotify.html#VALhook">hook</a> [<a href="Irmin_watcher_inotify.html">Irmin_watcher_inotify</a>]</td>
+<tr><td><a href="Irmin_watcher_core.html#VALhook">hook</a> [<a href="Irmin_watcher_core.html">Irmin_watcher_core</a>]</td>
 <td><div class="info">
-<code class="code">hook id p f</code> is the hook calling <code class="code">f</code> everytime a sub-path of <code class="code">p</code>
-    is modified.
-</div>
-</td></tr>
-<tr><td><a href="Irmin_watcher_fsevents.html#VALhook">hook</a> [<a href="Irmin_watcher_fsevents.html">Irmin_watcher_fsevents</a>]</td>
-<td><div class="info">
-<code class="code">hook id p f</code> is the hook calling <code class="code">f</code> everytime a sub-path of <code class="code">p</code>
-    is modified.
-</div>
-</td></tr>
-<tr><td><a href="Irmin_watcher_polling.html#VALhook">hook</a> [<a href="Irmin_watcher_polling.html">Irmin_watcher_polling</a>]</td>
-<td><div class="info">
-<code class="code">hook delay id p f</code> is the hook calling <code class="code">f</code> everytime a sub-path
-    of <code class="code">p</code> is modified.
+<code class="code">hook t</code> is <code class="code">t</code>'s hook.
 </div>
 </td></tr>
 <tr><td><a href="Irmin_watcher.html#VALhook">hook</a> [<a href="Irmin_watcher.html">Irmin_watcher</a>]</td>
 <td><div class="info">
-<code class="code">hook id p f</code> is the hook calling <code class="code">f</code> everytime a sub-path of <code class="code">p</code>
-    is modified.
+<code class="code">hook t</code> is an <code class="code"><span class="constructor">Irmin</span>.<span class="constructor">Watcher</span></code> compatible representation of <a href="Irmin_watcher.html#VALv"><code class="code"><span class="constructor">Irmin_watcher</span>.v</code></a>.
 </div>
 </td></tr>
 <tr><td align="left"><br>L</td></tr>
+<tr><td><a href="Irmin_watcher_core.Watchdog.html#VALlength">length</a> [<a href="Irmin_watcher_core.Watchdog.html">Irmin_watcher_core.Watchdog</a>]</td>
+<td><div class="info">
+<code class="code">length t</code> is the number of watchdog threads.
+</div>
+</td></tr>
+<tr><td><a href="Irmin_watcher_core.Dispatch.html#VALlength">length</a> [<a href="Irmin_watcher_core.Dispatch.html">Irmin_watcher_core.Dispatch</a>]</td>
+<td><div class="info">
+<code class="code">length t</code> is <code class="code">t</code>'s length.
+</div>
+</td></tr>
 <tr><td><a href="Irmin_watcher_polling.html#VALlisten">listen</a> [<a href="Irmin_watcher_polling.html">Irmin_watcher_polling</a>]</td>
 <td><div class="info">
 <code class="code">listen ~wait_for_changes ~dir</code> is the watchdog hook using
@@ -117,8 +112,13 @@ The default interval for active polling, in seconds.
 <code class="code">pp</code> is the pretty-printer for digest sets.
 </div>
 </td></tr>
+<tr><td><a href="Irmin_watcher_core.Digests.html#VALpp_elt">pp_elt</a> [<a href="Irmin_watcher_core.Digests.html">Irmin_watcher_core.Digests</a>]</td>
+<td><div class="info">
+<code class="code">pp_elt</code> is the pretty-printing function for digest elements.
+</div>
+</td></tr>
 <tr><td align="left"><br>R</td></tr>
-<tr><td><a href="Irmin_watcher_core.Callback.html#VALremove">remove</a> [<a href="Irmin_watcher_core.Callback.html">Irmin_watcher_core.Callback</a>]</td>
+<tr><td><a href="Irmin_watcher_core.Dispatch.html#VALremove">remove</a> [<a href="Irmin_watcher_core.Dispatch.html">Irmin_watcher_core.Dispatch</a>]</td>
 <td><div class="info">
 <code class="code">remove t ~id ~dir</code> removes the callback with ID <code class="code">id</code> on the
       directory <code class="code">dir</code>.
@@ -137,10 +137,15 @@ The default interval for active polling, in seconds.
       previous one.
 </div>
 </td></tr>
-<tr><td><a href="Irmin_watcher_core.Callback.html#VALstats">stats</a> [<a href="Irmin_watcher_core.Callback.html">Irmin_watcher_core.Callback</a>]</td>
+<tr><td><a href="Irmin_watcher_core.Dispatch.html#VALstats">stats</a> [<a href="Irmin_watcher_core.Dispatch.html">Irmin_watcher_core.Dispatch</a>]</td>
 <td><div class="info">
 <code class="code">stats t ~dir</code> is the number of active callbacks registered for
       the directory <code class="code">dir</code>.
+</div>
+</td></tr>
+<tr><td><a href="Irmin_watcher.html#VALstats">stats</a> [<a href="Irmin_watcher.html">Irmin_watcher</a>]</td>
+<td><div class="info">
+<code class="code">stats ()</code> is a snapshot of <code class="code">v</code>'s stats.
 </div>
 </td></tr>
 <tr><td><a href="Irmin_watcher_core.Watchdog.html#VALstop">stop</a> [<a href="Irmin_watcher_core.Watchdog.html">Irmin_watcher_core.Watchdog</a>]</td>
@@ -153,6 +158,37 @@ The default interval for active polling, in seconds.
 <td><div class="info">
 <code class="code">stoppable t</code> is a function <code class="code">f</code> such that calling <code class="code">f</code> will cancel
     the thread <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td align="left"><br>V</td></tr>
+<tr><td><a href="Irmin_watcher_inotify.html#VALv">v</a> [<a href="Irmin_watcher_inotify.html">Irmin_watcher_inotify</a>]</td>
+<td><div class="info">
+<code class="code">v id p f</code> is the hook calling <code class="code">f</code> everytime a sub-path of <code class="code">p</code> is
+    modified.
+</div>
+</td></tr>
+<tr><td><a href="Irmin_watcher_fsevents.html#VALv">v</a> [<a href="Irmin_watcher_fsevents.html">Irmin_watcher_fsevents</a>]</td>
+<td><div class="info">
+<code class="code">v id p f</code> is the hook calling <code class="code">f</code> everytime a sub-path of <code class="code">p</code> is
+    modified.
+</div>
+</td></tr>
+<tr><td><a href="Irmin_watcher_polling.html#VALv">v</a> [<a href="Irmin_watcher_polling.html">Irmin_watcher_polling</a>]</td>
+<td><div class="info">
+<code class="code">v delay id p f</code> is the hook calling <code class="code">f</code> everytime a sub-path of
+    <code class="code">p</code> is modified.
+</div>
+</td></tr>
+<tr><td><a href="Irmin_watcher.html#VALv">v</a> [<a href="Irmin_watcher.html">Irmin_watcher</a>]</td>
+<td><div class="info">
+<code class="code">v id p f</code> is the listen hook calling <code class="code">f</code> everytime a sub-path of
+    <code class="code">p</code> is modified.
+</div>
+</td></tr>
+<tr><td align="left"><br>W</td></tr>
+<tr><td><a href="Irmin_watcher_core.html#VALwatchdog">watchdog</a> [<a href="Irmin_watcher_core.html">Irmin_watcher_core</a>]</td>
+<td><div class="info">
+<code class="code">watchdog t</code> is <code class="code">t</code>'s watchdog.
 </div>
 </td></tr>
 </table>

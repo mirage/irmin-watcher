@@ -14,13 +14,14 @@
 <body>
 <code class="code"><span class="keyword">sig</span>
 &nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;callback&nbsp;:
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Callback</span>.t
-&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;hook&nbsp;=&nbsp;(string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit)&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;dispatch&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Dispatch</span>.t
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;hook&nbsp;=&nbsp;(string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t)&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;empty&nbsp;:&nbsp;unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;clear&nbsp;:&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;clear&nbsp;:&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;start&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;dir:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.hook&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;stop&nbsp;:&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;dir:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;stop&nbsp;:&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;dir:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;length&nbsp;:&nbsp;<span class="constructor">Irmin_watcher_core</span>.<span class="constructor">Watchdog</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int
 <span class="keyword">end</span></code></body></html>

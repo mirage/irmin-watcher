@@ -13,6 +13,9 @@
 </head>
 <body>
 <code class="code"><span class="keyword">sig</span>
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;hook&nbsp;:&nbsp;<span class="constructor">Irmin_watcher_core</span>.t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;v&nbsp;:&nbsp;<span class="constructor">Irmin_watcher_core</span>.t
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;mode&nbsp;:&nbsp;[&nbsp;<span class="keywordsign">`</span><span class="constructor">FSEvents</span>&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">Inotify</span>&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">Polling</span>&nbsp;]
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;stats&nbsp;=&nbsp;{&nbsp;watchdogs&nbsp;:&nbsp;int;&nbsp;dispatches&nbsp;:&nbsp;int;&nbsp;}
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;hook&nbsp;:&nbsp;<span class="constructor">Irmin_watcher_core</span>.hook
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;stats&nbsp;:&nbsp;unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Irmin_watcher</span>.stats
 <span class="keyword">end</span></code></body></html>

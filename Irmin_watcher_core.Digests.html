@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <link rel="Start" href="index.html">
-<link rel="next" href="Irmin_watcher_core.Callback.html">
+<link rel="next" href="Irmin_watcher_core.Dispatch.html">
 <link rel="Up" href="Irmin_watcher_core.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
@@ -17,7 +17,7 @@
 </head>
 <body>
 <div class="navbar">&nbsp;<a class="up" href="Irmin_watcher_core.html" title="Irmin_watcher_core">Up</a>
-&nbsp;<a class="post" href="Irmin_watcher_core.Callback.html" title="Irmin_watcher_core.Callback">Next</a>
+&nbsp;<a class="post" href="Irmin_watcher_core.Dispatch.html" title="Irmin_watcher_core.Dispatch">Next</a>
 </div>
 <h1>Module <a href="type_Irmin_watcher_core.Digests.html">Irmin_watcher_core.Digests</a></h1>
 
@@ -28,15 +28,19 @@ Sets of filenames and their digests.<br>
 
 <pre><span class="keyword">include</span> Set.S</pre>
 
-<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Irmin_watcher_core.html#TYPEt">Irmin_watcher_core.t</a> Fmt.t</code></pre><div class="info ">
+<pre><span id="VALpp_elt"><span class="keyword">val</span> pp_elt</span> : <code class="type">elt Fmt.t</code></pre><div class="info ">
+<code class="code">pp_elt</code> is the pretty-printing function for digest elements.<br>
+</div>
+
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type">t Fmt.t</code></pre><div class="info ">
 <code class="code">pp</code> is the pretty-printer for digest sets.<br>
 </div>
 
-<pre><span id="VALsdiff"><span class="keyword">val</span> sdiff</span> : <code class="type"><a href="Irmin_watcher_core.html#TYPEt">Irmin_watcher_core.t</a> -> <a href="Irmin_watcher_core.html#TYPEt">Irmin_watcher_core.t</a> -> <a href="Irmin_watcher_core.html#TYPEt">Irmin_watcher_core.t</a></code></pre><div class="info ">
+<pre><span id="VALsdiff"><span class="keyword">val</span> sdiff</span> : <code class="type">t -> t -> t</code></pre><div class="info ">
 <code class="code">sdiff x y</code> is <code class="code">union (diff x y) (diff y x)</code>.<br>
 </div>
 
-<pre><span id="VALfiles"><span class="keyword">val</span> files</span> : <code class="type"><a href="Irmin_watcher_core.html#TYPEt">Irmin_watcher_core.t</a> -> string list</code></pre><div class="info ">
+<pre><span id="VALfiles"><span class="keyword">val</span> files</span> : <code class="type">t -> string list</code></pre><div class="info ">
 <code class="code">files t</code> is the list of files whose digest is stored in <code class="code">t</code>.<br>
 </div>
 </body></html>

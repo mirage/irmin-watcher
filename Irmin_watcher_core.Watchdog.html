@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <link rel="Start" href="index.html">
-<link rel="previous" href="Irmin_watcher_core.Callback.html">
+<link rel="previous" href="Irmin_watcher_core.Dispatch.html">
 <link rel="Up" href="Irmin_watcher_core.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
@@ -16,7 +16,7 @@
 <link title="Irmin_watcher_inotify" rel="Chapter" href="Irmin_watcher_inotify.html"><title>Irmin_watcher_core.Watchdog</title>
 </head>
 <body>
-<div class="navbar"><a class="pre" href="Irmin_watcher_core.Callback.html" title="Irmin_watcher_core.Callback">Previous</a>
+<div class="navbar"><a class="pre" href="Irmin_watcher_core.Dispatch.html" title="Irmin_watcher_core.Dispatch">Previous</a>
 &nbsp;<a class="up" href="Irmin_watcher_core.html" title="Irmin_watcher_core">Up</a>
 &nbsp;</div>
 <h1>Module <a href="type_Irmin_watcher_core.Watchdog.html">Irmin_watcher_core.Watchdog</a></h1>
@@ -33,11 +33,11 @@ The type for filesystem watchdogs.<br>
 </div>
 
 
-<pre><span id="VALcallback"><span class="keyword">val</span> callback</span> : <code class="type"><a href="Irmin_watcher_core.Watchdog.html#TYPEt">t</a> -> <a href="Irmin_watcher_core.Callback.html#TYPEt">Irmin_watcher_core.Callback.t</a></code></pre><div class="info ">
-<code class="code">callback t</code> is <code class="code">t</code>'s callback table.<br>
+<pre><span id="VALdispatch"><span class="keyword">val</span> dispatch</span> : <code class="type"><a href="Irmin_watcher_core.Watchdog.html#TYPEt">t</a> -> <a href="Irmin_watcher_core.Dispatch.html#TYPEt">Irmin_watcher_core.Dispatch.t</a></code></pre><div class="info ">
+<code class="code">dispath t</code> is the table of <code class="code">t</code>'s callback dispatch.<br>
 </div>
 
-<pre><span id="TYPEhook"><span class="keyword">type</span> <code class="type"></code>hook</span> = <code class="type">(string -> unit Lwt.t) -> (unit -> unit) Lwt.t</code> </pre>
+<pre><span id="TYPEhook"><span class="keyword">type</span> <code class="type"></code>hook</span> = <code class="type">(string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t</code> </pre>
 <div class="info ">
 The type for watchdog hook.<br>
 </div>
@@ -47,7 +47,7 @@ The type for watchdog hook.<br>
 <code class="code">empty ()</code> is the empty watchdog, monitoring no directory.<br>
 </div>
 
-<pre><span id="VALclear"><span class="keyword">val</span> clear</span> : <code class="type"><a href="Irmin_watcher_core.Watchdog.html#TYPEt">t</a> -> unit</code></pre><div class="info ">
+<pre><span id="VALclear"><span class="keyword">val</span> clear</span> : <code class="type"><a href="Irmin_watcher_core.Watchdog.html#TYPEt">t</a> -> unit Lwt.t</code></pre><div class="info ">
 <code class="code">clear ()</code> stops all the currently active watchdogs.<br>
 </div>
 
@@ -57,8 +57,12 @@ The type for watchdog hook.<br>
       previous one.<br>
 </div>
 
-<pre><span id="VALstop"><span class="keyword">val</span> stop</span> : <code class="type"><a href="Irmin_watcher_core.Watchdog.html#TYPEt">t</a> -> dir:string -> unit</code></pre><div class="info ">
+<pre><span id="VALstop"><span class="keyword">val</span> stop</span> : <code class="type"><a href="Irmin_watcher_core.Watchdog.html#TYPEt">t</a> -> dir:string -> unit Lwt.t</code></pre><div class="info ">
 <code class="code">stop t ~dir</code> stops the filesystem watchdog on directory <code class="code">dir</code>
       (if any).<br>
+</div>
+
+<pre><span id="VALlength"><span class="keyword">val</span> length</span> : <code class="type"><a href="Irmin_watcher_core.Watchdog.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+<code class="code">length t</code> is the number of watchdog threads.<br>
 </div>
 </body></html>
