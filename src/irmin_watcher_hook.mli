@@ -4,16 +4,19 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** FSevents backend for Irmin watchers.
+(** Active polling backend for Irmin watchers.
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
-val v: Irmin_watcher_core.t
-(** [v id p f] is the hook calling [f] everytime a sub-path of [p] is
-    modified. Return a function to call to remove the hook. Use the
-    FSevent framework to be notified on filesystem changes. *)
+open Irmin_watcher_core
 
-val mode: [`FSEvents]
+type event = [ `Unknown | `File of string ]
+(** The type for change event. *)
+
+val v: wait_for_changes:(unit -> event Lwt.t) -> dir:string -> Watchdog.hook
+(** [v ~wait_for_changes ~dir] is the watchdog hook using
+    [wait_for_changes] to detect filesystem updates in the directory
+    [dir]. The polling implemention just calls [Lwt_unix.sleep]. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

@@ -1,0 +1,18 @@
+(jbuild_version 1)
+
+(library
+  ((name irmin_watcher)
+   (modules (irmin_watcher_core irmin_watcher_hook irmin_watcher_backend
+             irmin_watcher_polling irmin_watcher))
+   (public_name irmin-watcher)
+   (c_names (realpath))
+   (libraries
+     (fmt lwt logs astring
+     (select irmin_watcher_backend.ml from
+        (osx-cf.lwt osx-fsevents.lwt -> irmin_watcher_fsevents.ml)
+        (inotify.lwt                 -> irmin_watcher_inotify.ml)
+        (lwt.unix                    -> irmin_watcher_polling.ml))
+     (select irmin_watcher_backend.mli from
+        (osx-cf.lwt osx-fsevents.lwt -> irmin_watcher_fsevents.mli)
+        (inotify.lwt                 -> irmin_watcher_inotify.mli)
+        (lwt.unix                    -> irmin_watcher_polling.mli))))))

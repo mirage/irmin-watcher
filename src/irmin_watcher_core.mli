@@ -113,6 +113,8 @@ val stoppable: (unit -> unit Lwt.t) -> (unit -> unit Lwt.t)
 (** [stoppable t] is a function [f] such that calling [f] will cancel
     the thread [t]. *)
 
+val default_polling_time: float ref
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
 

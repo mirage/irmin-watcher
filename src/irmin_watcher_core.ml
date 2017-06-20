@@ -170,6 +170,8 @@ let create listen =
   t.listen <- listen;
   t
 
+let default_polling_time = ref 1.
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
 

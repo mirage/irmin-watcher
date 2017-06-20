@@ -74,16 +74,35 @@ let v =
     in
     let unlisten = listen dir i (fun path ->
         events := path :: !events;
-        Lwt_condition.signal cond ();
-        Lwt.return_unit
+        Lwt_condition.signal cond ()
       ) in
-    Irmin_watcher_polling.listen ~wait_for_changes ~dir f >|= fun unpoll ->
+    Irmin_watcher_hook.v ~wait_for_changes ~dir f >|= fun unpoll ->
     fun () ->
       stop_watch () >>= fun () ->
       unlisten () >>= fun () ->
       unpoll ()
   in
   Irmin_watcher_core.create listen
+
+let mode = `Inotify
+
+let uname () =
+  try
+    let ic = Unix.open_process_in "uname" in
+    let uname = input_line ic in
+    let () = close_in ic in
+    Some uname
+  with Unix.Unix_error _ ->
+    None
+
+let is_linux () =
+  Sys.os_type = "Unix" && uname () = Some "Linux"
+
+type mode = [`Polling | `Inotify]
+
+let mode, v =
+  if is_linux () then (mode :> mode), v
+  else Irmin_watcher_polling.((mode :> mode), v)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

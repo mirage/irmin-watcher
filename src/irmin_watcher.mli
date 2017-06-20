@@ -14,7 +14,7 @@ val v: Irmin_watcher_core.t
     hook. Default to polling if no better solution is
     available. FSevents and Inotify backends are available. *)
 
-val mode: [`FSEvents | `Inotify | `Polling ]
+val mode: [ `FSEvents | `Inotify | `Polling ]
 
 type stats = {
   watchdogs : int;
@@ -26,6 +26,10 @@ val hook: Irmin_watcher_core.hook
 
 val stats: unit -> stats
 (** [stats ()] is a snapshot of [v]'s stats. *)
+
+val set_polling_time: float -> unit
+(** [set_polling_time f] set the polling interval to [f]. Only
+    valid when [mode = `Polling]. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

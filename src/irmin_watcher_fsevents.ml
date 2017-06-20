@@ -63,13 +63,15 @@ let v =
           Lwt_condition.signal cond ();
           Lwt.return_unit
         ) in
-    Irmin_watcher_polling.listen ~wait_for_changes ~dir f >|= fun unpoll ->
+    Irmin_watcher_hook.v ~wait_for_changes ~dir f >|= fun unpoll ->
     fun () ->
       stop_runloop () >>= fun () ->
       unlisten () >>= fun () ->
       unpoll ()
   in
   Irmin_watcher_core.create listen
+
+let mode = `FSEvents
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

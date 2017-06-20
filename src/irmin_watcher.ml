@@ -4,39 +4,9 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-let uname () =
-  try
-    let ic = Unix.open_process_in "uname" in
-    let uname = input_line ic in
-    let () = close_in ic in
-    Some uname
-  with Unix.Unix_error _ ->
-    None
+let v = Irmin_watcher_backend.v
 
-let _is_linux () =
-  Sys.os_type = "Unix" && uname () = Some "Linux"
-
-let v =
-#ifdef HAVE_FSEVENTS
-  let _ = uname in
-  Irmin_watcher_fsevents.v
-#elif defined HAVE_INOTIFY
-  if _is_linux () then
-    Irmin_watcher_inotify.v
-  else
-    Irmin_watcher_polling.(v !default_polling_time)
-#else
-  Irmin_watcher_polling.(v !default_polling_time)
-#endif
-
-let mode =
-#ifdef HAVE_FSEVENTS
-  `FSEvents
-#elif defined HAVE_INOTIFY
-  if _is_linux () then `Inotify else `Polling
-#else
-  `Polling
-#endif
+let mode = (Irmin_watcher_backend.mode :>  [ `FSEvents | `Inotify | `Polling ])
 
 let hook = Irmin_watcher_core.hook v
 
@@ -50,6 +20,11 @@ let stats () =
   let d = Irmin_watcher_core.Watchdog.dispatch w in
   { watchdogs  = Irmin_watcher_core.Watchdog.length w;
     dispatches = Irmin_watcher_core.Dispatch.length d }
+
+let set_polling_time f =
+  match mode with
+  | `Polling -> Irmin_watcher_core.default_polling_time := f
+  | _        -> ()
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

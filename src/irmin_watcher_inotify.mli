@@ -13,6 +13,9 @@ val v: Irmin_watcher_core.t
     modified. Return a function to call to remove the hook. Use
     inofity to be notified on filesystem changes. *)
 
+val mode: [`Inotify | `Polling]
+(** [mode] is [Inotify] on Linux and [`Polling] on Darwin. *)
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
 
