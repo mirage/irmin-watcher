@@ -54,7 +54,7 @@ let listen dir i fn =
           Lwt.return_unit (* i has just been closed by {!stop} *)
       | e -> Lwt.fail e)
   in
-  Irmin_watcher_core.stoppable (fun () -> iter i)
+  Core.stoppable (fun () -> iter i)
 
 (* Note: we use Inotify to detect any change, and we re-read the full
    tree on every change (so very similar to active polling, but
@@ -76,13 +76,13 @@ let v =
         events := path :: !events;
         Lwt_condition.signal cond ()
       ) in
-    Irmin_watcher_hook.v ~wait_for_changes ~dir f >|= fun unpoll ->
+    Hook.v ~wait_for_changes ~dir f >|= fun unpoll ->
     fun () ->
       stop_watch () >>= fun () ->
       unlisten () >>= fun () ->
       unpoll ()
   in
-  Irmin_watcher_core.create listen
+  Core.create listen
 
 let mode = `Inotify
 
@@ -102,7 +102,7 @@ type mode = [`Polling | `Inotify]
 
 let mode, v =
   if is_linux () then (mode :> mode), v
-  else Irmin_watcher_polling.((mode :> mode), v)
+  else Polling.((mode :> mode), v)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

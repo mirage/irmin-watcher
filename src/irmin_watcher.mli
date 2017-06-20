@@ -8,7 +8,7 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
-val v: Irmin_watcher_core.t
+val v: Core.t
 (** [v id p f] is the listen hook calling [f] everytime a sub-path of
     [p] is modified. Return a function to call to remove the
     hook. Default to polling if no better solution is
@@ -21,7 +21,7 @@ type stats = {
   dispatches: int;
 }
 
-val hook: Irmin_watcher_core.hook
+val hook: Core.hook
 (** [hook t] is an {!Irmin.Watcher} compatible representation of {!v}. *)
 
 val stats: unit -> stats

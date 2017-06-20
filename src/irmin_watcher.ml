@@ -4,11 +4,11 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-let v = Irmin_watcher_backend.v
+let v = Backend.v
 
-let mode = (Irmin_watcher_backend.mode :>  [ `FSEvents | `Inotify | `Polling ])
+let mode = (Backend.mode :>  [ `FSEvents | `Inotify | `Polling ])
 
-let hook = Irmin_watcher_core.hook v
+let hook = Core.hook v
 
 type stats = {
   watchdogs : int;
@@ -16,14 +16,14 @@ type stats = {
 }
 
 let stats () =
-  let w = Irmin_watcher_core.watchdog v in
-  let d = Irmin_watcher_core.Watchdog.dispatch w in
-  { watchdogs  = Irmin_watcher_core.Watchdog.length w;
-    dispatches = Irmin_watcher_core.Dispatch.length d }
+  let w = Core.watchdog v in
+  let d = Core.Watchdog.dispatch w in
+  { watchdogs  = Core.Watchdog.length w;
+    dispatches = Core.Dispatch.length d }
 
 let set_polling_time f =
   match mode with
-  | `Polling -> Irmin_watcher_core.default_polling_time := f
+  | `Polling -> Core.default_polling_time := f
   | _        -> ()
 
 (*---------------------------------------------------------------------------

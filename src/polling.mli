@@ -4,17 +4,21 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Inotify backend for Irmin watchers.
+(** Active polling backend for Irmin watchers.
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
-val v: Irmin_watcher_core.t
-(** [v id p f] is the hook calling [f] everytime a sub-path of [p] is
-    modified. Return a function to call to remove the hook. Use
-    inofity to be notified on filesystem changes. *)
+open Core
 
-val mode: [`Inotify | `Polling]
-(** [mode] is [Inotify] on Linux and [`Polling] on Darwin. *)
+val with_delay: float -> t
+(** [with_delay delay id p f] is the hook calling [f] everytime a
+    sub-path of [p] is modified. Return a function to call to remove
+    the hook. Active polling is done every [delay] seconds. *)
+
+val v: t
+(** [v] is [with_delay !default_polling_time]. *)
+
+val mode: [`Polling]
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
