@@ -4,27 +4,21 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-let v = Backend.v
+(** Active polling backend for Irmin watchers.
 
-let mode = (Backend.mode :>  [ `FSEvents | `Inotify | `Polling ])
+    {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
-let hook = Core.hook v
+open Core
 
-type stats = {
-  watchdogs : int;
-  dispatches: int;
-}
+val with_delay: float -> t
+(** [with_delay delay id p f] is the hook calling [f] everytime a
+    sub-path of [p] is modified. Return a function to call to remove
+    the hook. Active polling is done every [delay] seconds. *)
 
-let stats () =
-  let w = Core.watchdog v in
-  let d = Core.Watchdog.dispatch w in
-  { watchdogs  = Core.Watchdog.length w;
-    dispatches = Core.Dispatch.length d }
+val v: t
+(** [v] is [with_delay !default_polling_time]. *)
 
-let set_polling_time f =
-  match mode with
-  | `Polling -> Core.default_polling_time := f
-  | _        -> ()
+val mode: [`Polling]
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

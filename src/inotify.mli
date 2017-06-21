@@ -4,14 +4,17 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** FSevents backend for Irmin watchers.
+(** Inotify backend for Irmin watchers.
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
-val v: Irmin_watcher_core.t
+val v: Core.t
 (** [v id p f] is the hook calling [f] everytime a sub-path of [p] is
-    modified. Return a function to call to remove the hook. Use the
-    FSevent framework to be notified on filesystem changes. *)
+    modified. Return a function to call to remove the hook. Use
+    inofity to be notified on filesystem changes. *)
+
+val mode: [`Inotify | `Polling]
+(** [mode] is [Inotify] on Linux and [`Polling] on Darwin. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

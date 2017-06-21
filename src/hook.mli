@@ -4,27 +4,19 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-let v = Backend.v
+(** Active polling backend for Irmin watchers.
 
-let mode = (Backend.mode :>  [ `FSEvents | `Inotify | `Polling ])
+    {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
-let hook = Core.hook v
+open Core
 
-type stats = {
-  watchdogs : int;
-  dispatches: int;
-}
+type event = [ `Unknown | `File of string ]
+(** The type for change event. *)
 
-let stats () =
-  let w = Core.watchdog v in
-  let d = Core.Watchdog.dispatch w in
-  { watchdogs  = Core.Watchdog.length w;
-    dispatches = Core.Dispatch.length d }
-
-let set_polling_time f =
-  match mode with
-  | `Polling -> Core.default_polling_time := f
-  | _        -> ()
+val v: wait_for_changes:(unit -> event Lwt.t) -> dir:string -> Watchdog.hook
+(** [v ~wait_for_changes ~dir] is the watchdog hook using
+    [wait_for_changes] to detect filesystem updates in the directory
+    [dir]. The polling implemention just calls [Lwt_unix.sleep]. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

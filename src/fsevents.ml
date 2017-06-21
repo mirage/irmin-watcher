@@ -39,7 +39,7 @@ let listen stream fn =
       fn @@ path
     ) stream
   in
-  Irmin_watcher_core.stoppable iter
+  Core.stoppable iter
 
 (* Note: we use FSevents to detect any change, and we re-read the full
    tree on every change (so very similar to active polling, but
@@ -63,13 +63,15 @@ let v =
           Lwt_condition.signal cond ();
           Lwt.return_unit
         ) in
-    Irmin_watcher_polling.listen ~wait_for_changes ~dir f >|= fun unpoll ->
+    Hook.v ~wait_for_changes ~dir f >|= fun unpoll ->
     fun () ->
       stop_runloop () >>= fun () ->
       unlisten () >>= fun () ->
       unpoll ()
   in
-  Irmin_watcher_core.create listen
+  Core.create listen
+
+let mode = `FSEvents
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

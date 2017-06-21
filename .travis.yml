@@ -7,13 +7,14 @@ dist: trusty
 env:
   global:
   - ALCOTEST_SHOW_ERRORS=1
+  - PACKAGE=irmin-watcher
 matrix:
   include:
-  - env: OCAML_VERSION=4.02
+  - env: OCAML_VERSION=4.04
     os: linux
   - env: OCAML_VERSION=4.03
     os: linux
-  - env: OCAML_VERSION=4.03 EXTRA_DEPS=osx-fsevents PINS="lwt:https://github.com/dsheets/lwt.git#bad-library-search-path-pthread-2.5.2"
+  - env: OCAML_VERSION=4.03 EXTRA_DEPS=osx-fsevents
     os: osx
     osx_image: xcode7.3
   - env: OCAML_VERSION=4.03 EXTRA_DEPS=inotify

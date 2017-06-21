@@ -6,7 +6,7 @@
 
 open Lwt.Infix
 open Astring
-module Digests = Irmin_watcher_core.Digests
+module Digests = Core.Digests
 
 let (/) = Filename.concat
 
@@ -59,7 +59,7 @@ let read_files dir =
 
 type event = [ `Unknown | `File of string ]
 
-let rec poll ~callback ~wait_for_changes dir files (event:event) =
+let rec poll n ~callback ~wait_for_changes dir files (event:event) =
   ( match event with
   | `Unknown -> read_files dir
   | `File f  ->
@@ -70,29 +70,27 @@ let rec poll ~callback ~wait_for_changes dir files (event:event) =
       | None   -> Lwt.return files
       | Some d -> Lwt.return (Digests.add d files)
   ) >>= fun new_files ->
+  Log.debug
+    (fun l -> l "files=%a new_files=%a" Digests.pp files Digests.pp new_files);
   let diff = Digests.sdiff files new_files in
   let process () =
     if Digests.is_empty diff then Lwt.return_unit
     else (
-      Log.debug (fun f -> f "polling %s: diff:%a" dir Digests.pp diff);
+      Log.debug (fun f -> f "[%d] polling %s: diff:%a" n dir Digests.pp diff);
       let files = Digests.files diff in
       Lwt_list.iter_p callback files)
   in
   process () >>= fun () ->
   wait_for_changes () >>= fun event ->
-  poll ~callback ~wait_for_changes dir new_files event
+  poll n ~callback ~wait_for_changes dir new_files event
 
-let listen ~wait_for_changes ~dir callback =
+let id = ref 0
+
+let v ~wait_for_changes ~dir callback =
+  let n = !id in incr id;
   read_files dir >|= fun files ->
-  Irmin_watcher_core.stoppable
-    (fun () -> poll ~callback ~wait_for_changes dir files `Unknown)
-
-let default_polling_time = ref 1.
-
-let v delay =
-  Log.info (fun l -> l "Polling mode");
-  let wait_for_changes () = Lwt_unix.sleep delay >|= fun () -> `Unknown in
-  Irmin_watcher_core.create (fun dir -> listen ~wait_for_changes ~dir)
+  Core.stoppable
+    (fun () -> poll n ~callback ~wait_for_changes dir files `Unknown)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

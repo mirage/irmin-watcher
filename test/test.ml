@@ -133,8 +133,8 @@ let reporter () =
     let k _ = over (); k () in
     let ppf = match level with Logs.App -> Fmt.stdout | _ -> Fmt.stderr in
     let with_stamp h _tags k fmt =
-      let dt = Mtime.to_us (Mtime.elapsed ()) in
-      Fmt.kpf k ppf ("%0+04.0fus %a %a @[" ^^ fmt ^^ "@]@.")
+      let dt = Mtime.Span.to_us (Mtime_clock.elapsed ()) in
+      Fmt.kpf k ppf ("%+04.0fus %a %a @[" ^^ fmt ^^ "@]@.")
         dt
         Fmt.(styled `Magenta string) (pad 10 @@ Logs.Src.name src)
         Logs_fmt.pp_header (level, h)
@@ -147,4 +147,5 @@ let reporter () =
 let () =
   Logs.set_level (Some Logs.Debug);
   Logs.set_reporter (reporter ());
+  Irmin_watcher.set_polling_time 0.1;
   Alcotest.run "irmin-watch" tests

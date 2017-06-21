@@ -8,3 +8,4 @@ tmp
 *.byte
 pkg/META
 test/_tags
+.merlin

@@ -4,14 +4,24 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Inotify backend for Irmin watchers.
+open Lwt.Infix
 
-    {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
+let src = Logs.Src.create "irw-polling" ~doc:"Irmin watcher using using polling"
+module Log = (val Logs.src_log src : Logs.LOG)
 
-val v: Irmin_watcher_core.t
-(** [v id p f] is the hook calling [f] everytime a sub-path of [p] is
-    modified. Return a function to call to remove the hook. Use
-    inofity to be notified on filesystem changes. *)
+let with_delay delay =
+  Log.info (fun l -> l "Polling mode");
+  let wait_for_changes () = Lwt_unix.sleep delay >|= fun () -> `Unknown in
+  Core.create (fun dir -> Hook.v ~wait_for_changes ~dir)
+
+let mode = `Polling
+
+let v =
+  Log.info (fun l -> l "Polling mode");
+  let wait_for_changes () =
+    Lwt_unix.sleep !Core.default_polling_time >|= fun () -> `Unknown
+  in
+  Core.create (fun dir -> Hook.v ~wait_for_changes ~dir)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
