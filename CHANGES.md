@@ -1,3 +1,7 @@
+### 0.3.0 (2017-06-21)
+
+- Use jbuilder (#11, @samoht)
+
 ### 0.2.0 (2016-11-14)
 
 - Allow to watch non-existing directories (#8, @samoht)
