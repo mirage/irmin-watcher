@@ -10,7 +10,7 @@ env:
   - PACKAGE=irmin-watcher
 matrix:
   include:
-  - env: OCAML_VERSION=4.02
+  - env: OCAML_VERSION=4.04
     os: linux
   - env: OCAML_VERSION=4.03
     os: linux
