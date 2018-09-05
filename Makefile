@@ -1,10 +1,10 @@
 .PHONY: all test clean
 
 all:
-	jbuilder build --dev
+	dune build --dev
 
 test:
-	jbuilder runtest --dev
+	dune runtest --dev
 
 clean:
-	jbuilder clean
+	dune clean
