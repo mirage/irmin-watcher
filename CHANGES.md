@@ -1,3 +1,8 @@
+### 0.4.0 (2018-10-08)
+
+- use dune (#13, @mc10)
+- rename `unix_realpath` function name to avoid name clashes (#17, @samoht)
+
 ### 0.3.0 (2017-06-21)
 
 - Use jbuilder (#11, @samoht)
