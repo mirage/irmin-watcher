@@ -16,7 +16,7 @@ let stoppable t =
   Lwt.async (fun () -> Lwt.pick ([s; t ()]));
   function () -> Lwt.wakeup u (); Lwt.return_unit
 
-external unix_realpath : string -> string = "unix_realpath"
+external unix_realpath : string -> string = "irmin_watcher_unix_realpath"
 
 let realpath dir =
   let (/) x y = match y with
