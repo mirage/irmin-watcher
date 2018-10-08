@@ -1,10 +1,10 @@
 .PHONY: all test clean
 
 all:
-	dune build --dev
+	dune build
 
 test:
-	dune runtest --dev
+	dune runtest
 
 clean:
 	dune clean
