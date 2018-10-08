@@ -9,3 +9,4 @@ tmp
 pkg/META
 test/_tags
 .merlin
+_opam
