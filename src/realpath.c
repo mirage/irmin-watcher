@@ -28,7 +28,7 @@
 #include <caml/unixsupport.h>
 
 #ifdef WIN32
-CAMLprim value unix_realpath(value path)
+CAMLprim value irmin_watcher_unix_realpath(value path)
 {
   TCHAR buffer[PATH_MAX]=TEXT("");
   DWORD error = 0;
@@ -41,7 +41,7 @@ CAMLprim value unix_realpath(value path)
   return caml_copy_string(buffer);
 }
 #else
-CAMLprim value unix_realpath(value path)
+CAMLprim value irmin_watcher_unix_realpath(value path)
 {
   char buffer[PATH_MAX];
   char *r;
