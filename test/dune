@@ -1,8 +1,3 @@
-(executable
+(test
   (name test)
   (libraries alcotest logs.fmt irmin-watcher mtime mtime.clock.os))
-
-(alias
-  (name runtest)
-  (deps (:exe test.exe))
-  (action (chdir %{workspace_root} (run %{exe} -q --color=always))))
