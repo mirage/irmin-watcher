@@ -43,10 +43,14 @@ let rec_files dir =
   aux [] dir
 
 let read_file ~prefix f =
-  if not (Sys.file_exists f) || Sys.is_directory f then None
-  else
-  let r = String.with_range ~first:(String.length prefix) f in
-  Some (r, Digest.file f)
+  try
+    if not (Sys.file_exists f) || Sys.is_directory f then None
+    else
+    let r = String.with_range ~first:(String.length prefix) f in
+    Some (r, Digest.file f)
+  with ex ->
+    Log.info (fun fm -> fm "read_file(%s): %a" f Fmt.exn ex);
+    None
 
 let read_files dir =
   rec_files dir >|= fun new_files ->
