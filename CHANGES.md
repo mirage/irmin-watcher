@@ -1,3 +1,9 @@
+### 0.4.1 (2019-07-02)
+
+- Clearer name for hook logger (@talex5, #21)
+- Fix race when scanning directories (@talex5, #21)
+- Make listen loop tail-recursive (@talex5, #21)
+
 ### 0.4.0 (2018-10-08)
 
 - use dune (#13, @mc10)
