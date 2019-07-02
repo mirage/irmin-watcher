@@ -42,14 +42,16 @@ let listen dir i fn =
   | Some p -> Filename.concat dir p
   in
   let rec iter i =
-    Lwt.catch (fun () ->
+    Lwt.try_bind (fun () ->
         Lwt_inotify.read i >>= fun e ->
         let path = path_of_event e in
         let es = event_kinds e in
         Log.debug (fun l -> l "inotify: %s %a" path Fmt.(Dump.list pp_kind) es);
         fn path;
-        iter i
-      ) (function
+        Lwt.return_unit
+      )
+      (fun () -> iter i)
+      (function
       | Unix.Unix_error (Unix.EBADF, _, _) ->
           Lwt.return_unit (* i has just been closed by {!stop} *)
       | e -> Lwt.fail e)
