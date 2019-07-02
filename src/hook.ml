@@ -10,7 +10,7 @@ module Digests = Core.Digests
 
 let (/) = Filename.concat
 
-let src = Logs.Src.create "irw-polling" ~doc:"Irmin watcher using using polling"
+let src = Logs.Src.create "irw-hook" ~doc:"Irmin watcher shared code"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let list_files kind dir =
