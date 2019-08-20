@@ -1,3 +1,7 @@
+### 0.5.0 (unreleased)
+
+- use a recent version of fsevents (@samoht)
+
 ### 0.4.1 (2019-07-02)
 
 - Clearer name for hook logger (@talex5, #21)

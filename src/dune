@@ -5,10 +5,10 @@
   (c_names     realpath)
   (libraries   fmt lwt logs astring
      (select backend.ml from
-        (osx-cf.lwt osx-fsevents.lwt -> fsevents.ml)
-        (inotify.lwt                 -> inotify.ml)
-        (lwt.unix                    -> polling.ml))
+        (cf-lwt fsevents.lwt -> fsevents.ml)
+        (inotify.lwt         -> inotify.ml)
+        (lwt.unix            -> polling.ml))
      (select backend.mli from
-        (osx-cf.lwt osx-fsevents.lwt -> fsevents.mli)
-        (inotify.lwt                 -> inotify.mli)
-        (lwt.unix                    -> polling.mli))))
+        (cf-lwt fsevents.lwt -> fsevents.mli)
+        (inotify.lwt         -> inotify.mli)
+        (lwt.unix            -> polling.mli))))
