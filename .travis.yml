@@ -11,7 +11,7 @@ matrix:
   include:
   - env: OCAML_VERSION=4.07
     os: linux
-  - env: OCAML_VERSION=4.07 PINS="osx-cf.dev:https://github.com/mirage/ocaml-osx-cf.git osx-fsevents.dev:https://github.com/mirage/ocaml-osx-fsevents.git"
+  - env: OCAML_VERSION=4.07
     os: osx
   - env: OCAML_VERSION=4.06
     os: linux
