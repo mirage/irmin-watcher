@@ -109,7 +109,7 @@ let polling_tests =
     ("enoent", `Quick, run (poll ~mkdir:false 0));
     ("basic", `Quick, run (poll ~mkdir:true 0));
     ("100s", `Quick, run (random_polls 100));
-    ("1000s", `Quick, run (random_polls 1000));
+    ("1000s", `Slow, run (random_polls 1000));
   ]
 
 let mode =
