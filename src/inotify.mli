@@ -8,12 +8,12 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
 
-val v: Core.t
+val v : Core.t
 (** [v id p f] is the hook calling [f] everytime a sub-path of [p] is
     modified. Return a function to call to remove the hook. Use
     inofity to be notified on filesystem changes. *)
 
-val mode: [`Inotify | `Polling]
+val mode : [ `Inotify | `Polling ]
 (** [mode] is [Inotify] on Linux and [`Polling] on Darwin. *)
 
 (*---------------------------------------------------------------------------

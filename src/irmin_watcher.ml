@@ -6,25 +6,19 @@
 
 let v = Backend.v
 
-let mode = (Backend.mode :>  [ `FSEvents | `Inotify | `Polling ])
+let mode = (Backend.mode :> [ `FSEvents | `Inotify | `Polling ])
 
 let hook = Core.hook v
 
-type stats = {
-  watchdogs : int;
-  dispatches: int;
-}
+type stats = { watchdogs : int; dispatches : int }
 
 let stats () =
   let w = Core.watchdog v in
   let d = Core.Watchdog.dispatch w in
-  { watchdogs  = Core.Watchdog.length w;
-    dispatches = Core.Dispatch.length d }
+  { watchdogs = Core.Watchdog.length w; dispatches = Core.Dispatch.length d }
 
 let set_polling_time f =
-  match mode with
-  | `Polling -> Core.default_polling_time := f
-  | _        -> ()
+  match mode with `Polling -> Core.default_polling_time := f | _ -> ()
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

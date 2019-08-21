@@ -13,7 +13,7 @@ open Core
 type event = [ `Unknown | `File of string ]
 (** The type for change event. *)
 
-val v: wait_for_changes:(unit -> event Lwt.t) -> dir:string -> Watchdog.hook
+val v : wait_for_changes:(unit -> event Lwt.t) -> dir:string -> Watchdog.hook
 (** [v ~wait_for_changes ~dir] is the watchdog hook using
     [wait_for_changes] to detect filesystem updates in the directory
     [dir]. The polling implemention just calls [Lwt_unix.sleep]. *)
