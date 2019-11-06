@@ -1,6 +1,6 @@
 (library
   (name        irmin_watcher)
-  (modules     core hook backend polling irmin_watcher)
+  (modules     core hook backend irmin_watcher)
   (public_name irmin-watcher)
   (c_names     realpath)
   (libraries   fmt lwt logs astring
