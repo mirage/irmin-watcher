@@ -7,6 +7,7 @@
 open Lwt.Infix
 
 let src = Logs.Src.create "irw-polling" ~doc:"Irmin watcher using using polling"
+
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let with_delay delay =

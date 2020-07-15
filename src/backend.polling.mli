@@ -1,1 +1,3 @@
-include module type of struct include Polling end
+include module type of struct
+  include Polling
+end

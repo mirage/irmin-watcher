@@ -6,30 +6,27 @@
 
 (** Irmin watchers.
 
-    {e %%VERSION%% — {{:%%PKG_HOMEPAGE%% }homepage}} *)
+    {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
-val v: Core.t
-(** [v id p f] is the listen hook calling [f] everytime a sub-path of
-    [p] is modified. Return a function to call to remove the
-    hook. Default to polling if no better solution is
-    available. FSevents and Inotify backends are available. *)
+val v : Core.t
+(** [v id p f] is the listen hook calling [f] everytime a sub-path of [p] is
+    modified. Return a function to call to remove the hook. Default to polling
+    if no better solution is available. FSevents and Inotify backends are
+    available. *)
 
-val mode: [ `FSEvents | `Inotify | `Polling ]
+val mode : [ `FSEvents | `Inotify | `Polling ]
 
-type stats = {
-  watchdogs : int;
-  dispatches: int;
-}
+type stats = { watchdogs : int; dispatches : int }
 
-val hook: Core.hook
+val hook : Core.hook
 (** [hook t] is an {!Irmin.Watcher} compatible representation of {!v}. *)
 
-val stats: unit -> stats
+val stats : unit -> stats
 (** [stats ()] is a snapshot of [v]'s stats. *)
 
-val set_polling_time: float -> unit
-(** [set_polling_time f] set the polling interval to [f]. Only
-    valid when [mode = `Polling]. *)
+val set_polling_time : float -> unit
+(** [set_polling_time f] set the polling interval to [f]. Only valid when
+    [mode = `Polling]. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
