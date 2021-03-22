@@ -24,6 +24,7 @@ depends: [
   "fmt"
   "astring"
   "inotify"      {os = "linux"}
+  "osx-cf"       {os = "macos"}
   "osx-fsevents" {os = "macos" & >= "0.2.0"}
 ]
 
