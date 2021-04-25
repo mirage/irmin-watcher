@@ -15,7 +15,7 @@ val with_delay : float -> t
     [p] is modified. Return a function to call to remove the hook. Active
     polling is done every [delay] seconds. *)
 
-val v : t
+val v : t Lazy.t
 (** [v] is [with_delay !default_polling_time]. *)
 
 val mode : [ `Polling ]
