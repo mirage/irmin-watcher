@@ -78,7 +78,7 @@ let v =
     stop_watch () >>= fun () ->
     unlisten () >>= fun () -> unpoll ()
   in
-  Core.create listen
+  lazy (Core.create listen)
 
 let mode = `Inotify
 

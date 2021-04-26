@@ -4,7 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-let v = Backend.v
+let v = Lazy.force Backend.v
 
 let mode = (Backend.mode :> [ `FSEvents | `Inotify | `Polling ])
 

@@ -8,7 +8,7 @@ bug-reports:  "https://github.com/mirage/irmin-watcher/issues"
 license:      "ISC"
 
 build: [
-  ["dune" "subst"] {pinned}
+  ["dune" "subst"] {dev}
   ["dune" "build" "-p" name "-j" jobs]
 ]
 
@@ -23,16 +23,24 @@ depends: [
   "logs"
   "fmt"
   "astring"
-  "inotify"      {os = "linux"}
-  "osx-fsevents" {os = "macos" & >= "0.2.0"}
+  "inotify"  {os = "linux"}
+  "cf-lwt"
+  "fsevents-lwt"
 ]
 
 synopsis: "Portable Irmin watch backends using FSevents or Inotify"
 description: """
 irmin-watcher implements [Irmin's watch hooks][watch] for various OS,
-using FSevents in OSX and Inotify on Linux.
+using FSevents in macOS and Inotify on Linux.
 
 irmin-watcher is distributed under the ISC license.
 
 [watch]: http://mirage.github.io/irmin/irmin/Irmin/Private/Watch/index.html#type-hook
 """
+
+pin-depends: [
+  [ "fsevents.dev" "git+https://github.com/mirage/ocaml-fsevents.git#f9e797e16bdbc730804cd684f07808022495c333" ]
+  [ "fsevents-lwt.dev" "git+https://github.com/mirage/ocaml-fsevents.git#f9e797e16bdbc730804cd684f07808022495c333" ]
+  [ "cf.dev" "git+https://github.com/mirage/ocaml-cf.git#918e2b9a7ab6871e48cce0508bce5e45981375f6" ]
+  [ "cf-lwt.dev" "git+https://github.com/mirage/ocaml-cf.git#918e2b9a7ab6871e48cce0508bce5e45981375f6" ]
+]

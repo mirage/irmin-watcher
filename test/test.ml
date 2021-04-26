@@ -31,7 +31,7 @@ let write f d =
 let move a b = Unix.rename (tmpdir / a) (tmpdir / b)
 
 let remove f =
-  try Unix.unlink (tmpdir / f) with e -> Alcotest.fail @@ Printexc.to_string e
+  try Unix.unlink (tmpdir / f) with e -> Alcotest.fail (Printexc.to_string e)
 
 let poll ~mkdir:m i () =
   if m then mkdir tmpdir;
@@ -109,7 +109,7 @@ let polling_tests =
     ("enoent", `Quick, run (poll ~mkdir:false 0));
     ("basic", `Quick, run (poll ~mkdir:true 0));
     ("100s", `Quick, run (random_polls 100));
-    ("1000s", `Quick, run (random_polls 1000));
+    ("1000s", `Slow, run (random_polls 1000));
   ]
 
 let mode =

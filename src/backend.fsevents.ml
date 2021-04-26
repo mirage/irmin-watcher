@@ -73,7 +73,7 @@ let v =
     stop_runloop () >>= fun () ->
     unlisten () >>= fun () -> unpoll ()
   in
-  Core.create listen
+  lazy (Core.create listen)
 
 let mode = `FSEvents
 
