@@ -1,4 +1,4 @@
-### dev
+### 0.5.0 (2020-04-30)
 
 - Switch to GitHub Actions from Travis (#31, @avsm)
 - Initialise backends only when needed via a
