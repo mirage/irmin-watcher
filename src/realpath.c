@@ -15,7 +15,12 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef _MSC_VER
+/* https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation */
+#define PATH_MAX MAX_PATH
+#else
 #include <sys/param.h>
+#endif
 #include <stdlib.h>
 #include <errno.h>
 
@@ -27,7 +32,7 @@
 #include <caml/signals.h>
 #include <caml/unixsupport.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 CAMLprim value irmin_watcher_unix_realpath(value path)
 {
   TCHAR buffer[PATH_MAX]=TEXT("");

@@ -1,3 +1,7 @@
+### Pending
+
+- Use _WIN32 and MAX_PATH on Windows to support MSVC (#34, @jonahbeckford)
+
 ### 0.5.0 (2020-04-30)
 
 - Switch to GitHub Actions from Travis (#31, @avsm)
