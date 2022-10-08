@@ -14,11 +14,11 @@
    backend.ml
    from
    (cf-eio fsevents-eio -> backend.fsevents.ml)
-   (inotify.lwt -> backend.inotify.ml)
+   (inotify.eio -> backend.inotify.ml)
    (lwt.unix -> backend.polling.ml))
   (select
    backend.mli
    from
    (cf-lwt fsevents-lwt -> backend.fsevents.mli)
-   (inotify.lwt -> backend.inotify.mli)
+   (inotify.eio -> backend.inotify.mli)
    (lwt.unix -> backend.polling.mli))))

@@ -20,6 +20,16 @@ let stats () =
 let set_polling_time f =
   match mode with `Polling -> Core.default_polling_time := f | _ -> ()
 
+let run fn =
+  Eio.Switch.run @@ fun sw ->
+  let open Effect.Deep in
+  try_with fn () {
+    effc = fun (type a) (e : a Effect.t) ->
+      match e with
+      | Hook.Top_switch -> Some (fun (k : (a, _) continuation) -> continue k sw)
+      | _ -> None
+  }
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
 

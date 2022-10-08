@@ -8,6 +8,10 @@ open Eio
 open Astring
 module Digests = Core.Digests
 
+type _ Effect.t += Top_switch : Eio.Switch.t Effect.t
+
+let top_switch () = Effect.perform Top_switch
+
 let ( / ) = Filename.concat
 
 let src = Logs.Src.create "irw-hook" ~doc:"Irmin watcher shared code"

@@ -18,11 +18,11 @@ let with_delay ~sw delay =
 
 let mode = `Polling
 
-let v ~sw =
+let v =
   let wait_for_changes () =
     Eio_unix.sleep !Core.default_polling_time |> fun () -> `Unknown
   in
-  lazy (Core.create (listen ~sw ~wait_for_changes))
+  lazy (let sw = Hook.top_switch () in Core.create (listen ~sw ~wait_for_changes))
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
