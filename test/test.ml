@@ -1,4 +1,4 @@
-open Lwt.Infix
+open Eio
 
 let ( / ) = Filename.concat
 
@@ -11,7 +11,7 @@ let clean () =
 
 let run f () =
   clean ();
-  Lwt_main.run (f ())
+  f ()
 
 let rec mkdir d =
   let perm = 0o0700 in
@@ -36,46 +36,48 @@ let remove f =
 let poll ~mkdir:m i () =
   if m then mkdir tmpdir;
   let events = ref [] in
-  let cond = Lwt_condition.create () in
-  Irmin_watcher.hook 0 tmpdir (fun e ->
+  let cond = Condition.create () in
+  let unwatch = 
+    Irmin_watcher.hook 0 tmpdir (fun e ->
       events := e :: !events;
-      Lwt_condition.broadcast cond ();
-      Lwt.return_unit)
-  >>= fun unwatch ->
+      Condition.broadcast cond)
+  in
   let reset () = events := [] in
   let rec wait ?n () =
     match !events with
-    | [] -> Lwt_condition.wait cond >>= fun () -> wait ?n ()
+    | [] -> Condition.await_no_mutex cond; wait ?n ()
     | e -> (
         match n with
         | None ->
             reset ();
-            Lwt.return e
+            e
         | Some n ->
-            if List.length e < n then Lwt_condition.wait cond >>= wait ~n
+            if List.length e < n then begin
+              Condition.await_no_mutex cond;
+              wait ~n ()
+            end
             else (
-              reset ();
-              Lwt.return e))
+              reset (); e))
   in
 
   write "foo" ("foo" ^ string_of_int i);
-  wait () >>= fun events ->
+  let events = wait () in
   Alcotest.(check (slist string String.compare)) "updte foo" [ "foo" ] events;
 
   remove "foo";
-  wait () >>= fun events ->
+  let events = wait () in
   Alcotest.(check (slist string String.compare)) "remove foo" [ "foo" ] events;
 
   write "foo" ("foo" ^ string_of_int i);
-  wait () >>= fun events ->
+  let events = wait () in
   Alcotest.(check (slist string String.compare)) "create foo" [ "foo" ] events;
 
   write "bar" ("bar" ^ string_of_int i);
-  wait () >>= fun events ->
+  let events = wait () in
   Alcotest.(check (slist string String.compare)) "create bar" [ "bar" ] events;
 
   move "bar" "barx";
-  wait ~n:2 () >>= fun events ->
+  let events = wait ~n:2 () in
   Alcotest.(check (slist string String.compare))
     "move bar" [ "bar"; "barx" ] events;
 
@@ -98,8 +100,8 @@ let prepare_fs n =
 let random_polls n () =
   mkdir tmpdir;
   let rec aux = function
-    | 0 -> Lwt.return_unit
-    | i -> poll ~mkdir:false i () >>= fun () -> aux (i - 1)
+    | 0 -> ()
+    | i -> poll ~mkdir:false i (); aux (i - 1)
   in
   prepare_fs n;
   match Irmin_watcher.mode with `Polling -> aux 10 | _ -> aux 100
