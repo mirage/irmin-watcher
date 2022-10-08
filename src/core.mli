@@ -41,11 +41,11 @@ module Dispatch : sig
   (** [stats t ~dir] is the number of active callbacks registered for the
       directory [dir]. *)
 
-  val apply : t -> dir:string -> file:string -> unit Lwt.t
+  val apply : t -> dir:string -> file:string -> unit
   (** [apply t ~dir ~file] calls [f file] for every callback [f] registered for
       the directory [dir]. *)
 
-  val add : t -> id:int -> dir:string -> (string -> unit Lwt.t) -> unit
+  val add : t -> id:int -> dir:string -> (string -> unit) -> unit
   (** [add t ~id ~dir f] adds a new callback [f] to the directory [dir], using
       the unique identifier [id]. *)
 
@@ -66,20 +66,20 @@ module Watchdog : sig
   val dispatch : t -> Dispatch.t
   (** [dispath t] is the table of [t]'s callback dispatch. *)
 
-  type hook = (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
+  type hook = (string -> unit) -> (unit -> unit)
   (** The type for watchdog hook. *)
 
   val empty : unit -> t
   (** [empty ()] is the empty watchdog, monitoring no directory. *)
 
-  val clear : t -> unit Lwt.t
+  val clear : t -> unit
   (** [clear ()] stops all the currently active watchdogs. *)
 
-  val start : t -> dir:string -> hook -> unit Lwt.t
+  val start : t -> dir:string -> hook -> unit
   (** [start t ~dir h] adds a new callback hook on the directory [dir], starting
       a new watchdog if needed otherwise re-using the previous one. *)
 
-  val stop : t -> dir:string -> unit Lwt.t
+  val stop : t -> dir:string -> unit
   (** [stop t ~dir] stops the filesystem watchdog on directory [dir] (if any). *)
 
   val length : t -> int
@@ -87,7 +87,7 @@ module Watchdog : sig
 end
 
 type hook =
-  int -> string -> (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
+  int -> string -> (string -> unit) -> (unit -> unit)
 (** The type for Irmin.Watch hooks. *)
 
 type t
@@ -104,9 +104,9 @@ val hook : t -> hook
 
 (** {1 Helpers} *)
 
-val stoppable : (unit -> unit Lwt.t) -> unit -> unit Lwt.t
-(** [stoppable t] is a function [f] such that calling [f] will cancel the thread
-    [t]. *)
+val stoppable : sw:Eio.Switch.t -> (unit -> unit) -> unit -> unit
+(** [stoppable ~sw t] is a function [f] such that calling [f] will cancel the thread
+    [t]. The switch passed to the function is attached to the forked fiber for [t].  *)
 
 val default_polling_time : float ref
 
