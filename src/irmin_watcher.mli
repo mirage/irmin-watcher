@@ -28,6 +28,9 @@ val set_polling_time : float -> unit
 (** [set_polling_time f] set the polling interval to [f]. Only valid when
     [mode = `Polling]. *)
 
+val run : (unit -> 'a) -> 'a
+(** Handles calls to the {! Hook.Top_switch} effect *)
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
 
