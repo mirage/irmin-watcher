@@ -10,6 +10,10 @@
 
 open Core
 
+type _ Effect.t += Top_switch : Eio.Switch.t Effect.t
+
+val top_switch : unit -> Eio.Switch.t
+
 type event = [ `Unknown | `File of string ]
 (** The type for change event. *)
 
