@@ -66,7 +66,7 @@ module Dispatch = struct
   (* call all the callbacks on the file *)
   let apply t ~dir ~file =
     let fns = try Hashtbl.find t dir with Not_found -> [] in
-    Fiber.iter
+    Fiber.List.iter
       (fun (id, f) ->
         Log.debug (fun f -> f "callback %d" id);
         f file)
