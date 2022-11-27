@@ -85,7 +85,7 @@ let rec poll n ~callback ~wait_for_changes dir files (event : event) =
     else (
       Log.debug (fun f -> f "[%d] polling %s: diff:%a" n dir Digests.pp diff);
       let files = Digests.files diff in
-      Fiber.iter callback files)
+      Fiber.List.iter callback files)
   in
   process ();
   let event = wait_for_changes () in
