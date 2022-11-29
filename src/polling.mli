@@ -9,9 +9,8 @@
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
 open Core
-open Eio
 
-val with_delay : sw:Switch.t -> float -> t
+val with_delay : float -> t
 (** [with_delay delay id p f] is the hook calling [f] everytime a sub-path of
     [p] is modified. Return a function to call to remove the hook. Active
     polling is done every [delay] seconds. *)
