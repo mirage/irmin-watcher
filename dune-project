@@ -22,7 +22,7 @@ irmin-watcher is distributed under the ISC license.
  (depends
    (ocaml (>= "4.02.0"))
    (alcotest :with-test)
-   (mtime (and :with-test (>= "1.0.0")))
+   (mtime (and :with-test (>= "2.0.0")))
    (inotify (= :os "linux"))
    (cf-lwt (>="0.4"))
    lwt
