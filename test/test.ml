@@ -132,7 +132,7 @@ let reporter () =
     in
     let ppf = match level with Logs.App -> Fmt.stdout | _ -> Fmt.stderr in
     let with_stamp h _tags k fmt =
-      let dt = Mtime.Span.to_us (Mtime_clock.elapsed ()) in
+      let dt = Mtime.Span.to_float_ns (Mtime_clock.elapsed ()) in
       Fmt.kpf k ppf
         ("%+04.0fus %a %a @[" ^^ fmt ^^ "@]@.")
         dt
