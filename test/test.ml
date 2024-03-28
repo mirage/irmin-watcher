@@ -10,7 +10,7 @@ let clean () =
 
 let run f () =
   clean ();
-  f ()
+  try f () with Failure s when s = "Cancelled" -> ()
 
 let rec mkdir d =
   let perm = 0o0700 in

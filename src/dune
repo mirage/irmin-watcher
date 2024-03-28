@@ -8,7 +8,6 @@
   fmt
   logs
   astring
-  lwt_eio
   eio.unix
   (select
    backend.ml
