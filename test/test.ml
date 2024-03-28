@@ -1,7 +1,6 @@
 open Eio
 
 let ( / ) = Filename.concat
-
 let tmpdir = Filename.get_temp_dir_name () / "irmin-watcher"
 
 let clean () =
@@ -34,7 +33,7 @@ let remove f =
   try Unix.unlink (tmpdir / f) with e -> Alcotest.fail (Printexc.to_string e)
 
 let poll ~mkdir:m i () =
-  Eio.Switch.run @@ fun sw -> 
+  Eio.Switch.run @@ fun sw ->
   if m then mkdir tmpdir;
   let events = ref [] in
   let cond = Condition.create () in
@@ -46,19 +45,21 @@ let poll ~mkdir:m i () =
   let reset () = events := [] in
   let rec wait ?n () =
     match !events with
-    | [] -> Condition.await_no_mutex cond; wait ?n ()
+    | [] ->
+        Condition.await_no_mutex cond;
+        wait ?n ()
     | e -> (
         match n with
         | None ->
             reset ();
             e
         | Some n ->
-            if List.length e < n then begin
+            if List.length e < n then (
               Condition.await_no_mutex cond;
-              wait ~n ()
-            end
+              wait ~n ())
             else (
-              reset (); e))
+              reset ();
+              e))
   in
 
   write "foo" ("foo" ^ string_of_int i);
@@ -102,7 +103,9 @@ let random_polls n () =
   mkdir tmpdir;
   let rec aux = function
     | 0 -> ()
-    | i -> poll ~mkdir:false i (); aux (i - 1)
+    | i ->
+        poll ~mkdir:false i ();
+        aux (i - 1)
   in
   prepare_fs n;
   match Irmin_watcher.mode with `Polling -> aux 10 | _ -> aux 100

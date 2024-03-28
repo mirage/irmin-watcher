@@ -66,7 +66,7 @@ module Watchdog : sig
   val dispatch : t -> Dispatch.t
   (** [dispath t] is the table of [t]'s callback dispatch. *)
 
-  type hook = (string -> unit) -> (unit -> unit)
+  type hook = (string -> unit) -> unit -> unit
   (** The type for watchdog hook. *)
 
   val empty : unit -> t
@@ -86,8 +86,7 @@ module Watchdog : sig
   (** [length t] is the number of watchdog threads. *)
 end
 
-type hook =
-  int -> string -> (string -> unit) -> (unit -> unit)
+type hook = int -> string -> (string -> unit) -> unit -> unit
 (** The type for Irmin.Watch hooks. *)
 
 type t
@@ -105,8 +104,9 @@ val hook : t -> hook
 (** {1 Helpers} *)
 
 val stoppable : sw:Eio.Switch.t -> (unit -> unit) -> unit -> unit
-(** [stoppable ~sw t] is a function [f] such that calling [f] will cancel the thread
-    [t]. The switch passed to the function is attached to the forked fiber for [t].  *)
+(** [stoppable ~sw t] is a function [f] such that calling [f] will cancel the
+    thread [t]. The switch passed to the function is attached to the forked
+    fiber for [t]. *)
 
 val default_polling_time : float ref
 
