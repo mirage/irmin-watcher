@@ -8,7 +8,7 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
-val v : Core.t
+val v : sw:Eio.Switch.t -> Core.t
 (** [v id p f] is the listen hook calling [f] everytime a sub-path of [p] is
     modified. Return a function to call to remove the hook. Default to polling
     if no better solution is available. FSevents and Inotify backends are
@@ -18,10 +18,10 @@ val mode : [ `FSEvents | `Inotify | `Polling ]
 
 type stats = { watchdogs : int; dispatches : int }
 
-val hook : Core.hook
+val hook : sw:Eio.Switch.t -> Core.hook
 (** [hook t] is an {!Irmin.Watcher} compatible representation of {!v}. *)
 
-val stats : unit -> stats
+val stats : sw:Eio.Switch.t -> unit -> stats
 (** [stats ()] is a snapshot of [v]'s stats. *)
 
 val set_polling_time : float -> unit
