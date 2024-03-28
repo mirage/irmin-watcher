@@ -5,9 +5,7 @@
   ---------------------------------------------------------------------------*)
 
 let v ~sw = Lazy.force (Backend.v ~sw)
-
 let mode = (Backend.mode :> [ `FSEvents | `Inotify | `Polling ])
-
 let hook ~sw = Core.hook (v ~sw)
 
 type stats = { watchdogs : int; dispatches : int }

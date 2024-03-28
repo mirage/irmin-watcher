@@ -15,10 +15,7 @@ module Log = (val Logs.src_log src : Logs.LOG)
 let stoppable ~sw t =
   let p, r = Promise.create () in
   Fiber.fork ~sw (fun () ->
-    Fiber.both
-      (fun () -> Promise.await_exn p)
-      (fun () -> t ()) 
-  );
+      Fiber.both (fun () -> Promise.await_exn p) (fun () -> t ()));
   fun () -> Promise.resolve_error r (Failure "Cancelled")
 
 external unix_realpath : string -> string = "irmin_watcher_unix_realpath"
@@ -41,13 +38,9 @@ module Digests = struct
   end)
 
   let of_list l = List.fold_left (fun set elt -> add elt set) empty l
-
   let sdiff x y = union (diff x y) (diff y x)
-
   let digest_pp ppf d = Fmt.string ppf @@ Digest.to_hex d
-
   let pp_elt = Fmt.(Dump.pair string digest_pp)
-
   let pp ppf t = Fmt.(Dump.list pp_elt) ppf @@ elements t
 
   let files t =
@@ -58,9 +51,7 @@ module Dispatch = struct
   type t = (string, (int * (string -> unit)) list) Hashtbl.t
 
   let empty () : t = Hashtbl.create 10
-
   let clear t = Hashtbl.clear t
-
   let stats t ~dir = try List.length (Hashtbl.find t dir) with Not_found -> 0
 
   (* call all the callbacks on the file *)
@@ -89,10 +80,9 @@ module Watchdog = struct
   type t = { t : (string, unit -> unit) Hashtbl.t; d : Dispatch.t }
 
   let length t = Hashtbl.length t.t
-
   let dispatch t = t.d
 
-  type hook = (string -> unit ) -> (unit -> unit ) 
+  type hook = (string -> unit) -> unit -> unit
 
   let empty () : t = { t = Hashtbl.create 10; d = Dispatch.empty () }
 
@@ -105,8 +95,7 @@ module Watchdog = struct
 
   let start { t; d } ~dir listen =
     match watchdog t dir with
-    | Some _ ->
-        assert (Dispatch.stats d ~dir <> 0)
+    | Some _ -> assert (Dispatch.stats d ~dir <> 0)
     | None -> (
         (* Note: multiple threads can wait here *)
         let u = listen (fun file -> Dispatch.apply d ~dir ~file) in
@@ -121,19 +110,17 @@ module Watchdog = struct
 
   let stop { t; d } ~dir =
     match watchdog t dir with
-    | None ->
-        assert (Dispatch.stats d ~dir = 0)
+    | None -> assert (Dispatch.stats d ~dir = 0)
     | Some stop ->
-        if Dispatch.stats d ~dir <> 0 then (
-          Log.debug (fun f -> f "Active allback are registered for %s" dir))
+        if Dispatch.stats d ~dir <> 0 then
+          Log.debug (fun f -> f "Active allback are registered for %s" dir)
         else (
           Log.debug (fun f -> f "Stop watchdog for %s" dir);
           Hashtbl.remove t dir;
           stop ())
 end
 
-type hook =
-  int -> string -> (string -> unit) -> (unit -> unit)
+type hook = int -> string -> (string -> unit) -> unit -> unit
 
 type t = {
   mutable listen : int -> string -> (string -> unit) -> unit;
@@ -143,17 +130,13 @@ type t = {
 
 let watchdog t = t.watchdog
 
-let hook t id dir f = t.listen id dir f; t.stop
+let hook t id dir f =
+  t.listen id dir f;
+  t.stop
 
 let create listen =
   let watchdog = Watchdog.empty () in
-  let t =
-    {
-      listen = (fun _ _ _ -> ());
-      stop = (fun _ -> ());
-      watchdog;
-    }
-  in
+  let t = { listen = (fun _ _ _ -> ()); stop = (fun _ -> ()); watchdog } in
   let listen id dir fn =
     let dir = realpath dir in
     let d = Watchdog.dispatch watchdog in
