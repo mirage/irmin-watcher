@@ -9,7 +9,6 @@ open Astring
 module Digests = Core.Digests
 
 let ( / ) = Filename.concat
-
 let src = Logs.Src.create "irw-hook" ~doc:"Irmin watcher shared code"
 
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -64,14 +63,14 @@ type event = [ `Unknown | `File of string ]
 let rec poll n ~callback ~wait_for_changes dir files (event : event) =
   let new_files =
     match event with
-      | `Unknown -> read_files dir
-      | `File f -> (
-      let prefix = dir / "" in
-      let short_f = String.with_range ~first:(String.length prefix) f in
-      let files = Digests.filter (fun (x, _) -> x <> short_f) files in
-      match read_file ~prefix f with
-      | None -> files
-      | Some d -> Digests.add d files)
+    | `Unknown -> read_files dir
+    | `File f -> (
+        let prefix = dir / "" in
+        let short_f = String.with_range ~first:(String.length prefix) f in
+        let files = Digests.filter (fun (x, _) -> x <> short_f) files in
+        match read_file ~prefix f with
+        | None -> files
+        | Some d -> Digests.add d files)
   in
   Log.debug (fun l ->
       l "files=%a new_files=%a" Digests.pp files Digests.pp new_files);
