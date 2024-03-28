@@ -8,22 +8,21 @@ let src = Logs.Src.create "irw-polling" ~doc:"Irmin watcher using using polling"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-let listen ~wait_for_changes dir =
+let listen ~sw ~wait_for_changes dir =
   Log.info (fun l -> l "Polling mode");
-  let sw = Hook.top_switch () in 
   Hook.v ~sw ~wait_for_changes ~dir
 
-let with_delay delay =
+let with_delay ~sw delay =
   let wait_for_changes () = Eio_unix.sleep delay |> fun () -> `Unknown in
-  Core.create (listen ~wait_for_changes)
+  Core.create (listen ~sw ~wait_for_changes)
 
 let mode = `Polling
 
-let v =
+let v ~sw =
   let wait_for_changes () =
     Eio_unix.sleep !Core.default_polling_time |> fun () -> `Unknown
   in
-  lazy (Core.create (listen ~wait_for_changes))
+  lazy (Core.create (listen ~sw ~wait_for_changes))
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
