@@ -34,13 +34,14 @@ let remove f =
   try Unix.unlink (tmpdir / f) with e -> Alcotest.fail (Printexc.to_string e)
 
 let poll ~mkdir:m i () =
+  Eio.Switch.run @@ fun sw -> 
   if m then mkdir tmpdir;
   let events = ref [] in
   let cond = Condition.create () in
-  let unwatch = 
-    Irmin_watcher.hook 0 tmpdir (fun e ->
-      events := e :: !events;
-      Condition.broadcast cond)
+  let unwatch =
+    Irmin_watcher.hook ~sw 0 tmpdir (fun e ->
+        events := e :: !events;
+        Condition.broadcast cond)
   in
   let reset () = events := [] in
   let rec wait ?n () =
@@ -147,6 +148,7 @@ let reporter () =
   { Logs.report }
 
 let () =
+  Eio_main.run @@ fun _env ->
   Logs.set_level (Some Logs.Debug);
   Logs.set_reporter (reporter ());
   Irmin_watcher.set_polling_time 0.1;
