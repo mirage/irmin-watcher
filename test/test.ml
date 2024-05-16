@@ -64,7 +64,7 @@ let poll ~mkdir:m i () =
 
   write "foo" ("foo" ^ string_of_int i);
   let events = wait () in
-  Alcotest.(check (slist string String.compare)) "updte foo" [ "foo" ] events;
+  Alcotest.(check (slist string String.compare)) "update foo" [ "foo" ] events;
 
   remove "foo";
   let events = wait () in
@@ -151,7 +151,8 @@ let reporter () =
   { Logs.report }
 
 let () =
-  Eio_main.run @@ fun _env ->
+  Eio_main.run @@ fun env ->
+  Lwt_eio.with_event_loop ~clock:env#clock @@ fun _ ->
   Logs.set_level (Some Logs.Debug);
   Logs.set_reporter (reporter ());
   Irmin_watcher.set_polling_time 0.1;
