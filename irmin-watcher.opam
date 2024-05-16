@@ -17,16 +17,19 @@ doc: "https://mirage.github.io/irmin-watcher/"
 bug-reports: "https://github.com/mirage/irmin-watcher/issues"
 depends: [
   "dune" {>= "2.8"}
-  "ocaml" {>= "4.02.0"}
+  "ocaml" {>= "5.1.0"}
   "alcotest" {with-test}
   "mtime" {with-test & >= "2.0.0"}
   "inotify" {os = "linux"}
   "cf-lwt" {>= "0.4"}
   "lwt"
+  "eio" {>= "1.0"}
+  "eio_main" {with-test & >= "1.0"}
   "logs"
   "fmt"
   "astring"
   "fsevents-lwt"
+  "lwt_eio"
   "odoc" {with-doc}
 ]
 build: [
@@ -44,3 +47,6 @@ build: [
   ]
 ]
 dev-repo: "git+https://github.com/mirage/irmin-watcher.git"
+pin-depends: [
+  [ "inotify.dev" "git+https://github.com/whitequark/ocaml-inotify#b9cadad68ef3f4965853ea693171adf1d18c0599" ]
+]

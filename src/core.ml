@@ -14,9 +14,10 @@ module Log = (val Logs.src_log src : Logs.LOG)
 (* run [t] and returns an handler to stop the task. *)
 let stoppable ~sw t =
   let p, r = Promise.create () in
-  Fiber.fork ~sw (fun () ->
-      Fiber.both (fun () -> Promise.await_exn p) (fun () -> t ()));
-  fun () -> Promise.resolve_error r (Failure "Cancelled")
+  Fiber.fork_daemon ~sw (fun () ->
+      Fiber.first (fun () -> Promise.await_exn p) (fun () -> t ());
+      `Stop_daemon);
+  fun () -> Promise.resolve r (Ok ())
 
 external unix_realpath : string -> string = "irmin_watcher_unix_realpath"
 

@@ -1,5 +1,6 @@
 ### Pending
 
+- Move to Eio (#37, @patricoferris, @clecat)
 - Use _WIN32 and MAX_PATH on Windows to support MSVC (#34, @jonahbeckford)
 
 ### 0.5.0 (2020-04-30)

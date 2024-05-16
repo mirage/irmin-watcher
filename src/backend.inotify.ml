@@ -4,8 +4,6 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-open Lwt.Infix
-
 let src = Logs.Src.create "irw-inotify" ~doc:"Irmin watcher using Inotify"
 
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -47,8 +45,6 @@ let listen ~sw dir i fn =
       fn path
     with
     | () -> iter i
-    | exception Unix.Unix_error (Unix.EBADF, _, _) ->
-        () (* i has just been closed by {!stop} *)
     | exception e -> raise e
   in
   Core.stoppable ~sw (fun () -> iter i)
@@ -58,10 +54,9 @@ let listen ~sw dir i fn =
    blocking on incoming Inotify events instead of sleeping). We could
    probably do better, but at the moment it is more robust to do so,
    to avoid possible duplicated events. *)
-let v =
+let v ~sw =
   let open Eio in
-  let listen dir f () =
-    let sw = Hook.top_switch () in
+  let listen dir f =
     Log.info (fun l -> l "Inotify mode");
     let events = ref [] in
     let cond = Condition.create () in
@@ -76,13 +71,13 @@ let v =
           `File h
     in
     let unlisten =
-      listen dir i (fun path ->
+      listen ~sw dir i (fun path ->
           events := path :: !events;
           Condition.broadcast cond)
     in
-    let unpoll = Hook.v ~sw ~wait_for_changes ~dir f in
+    Hook.v ~sw ~wait_for_changes ~dir f |> fun unpoll () ->
     stop_watch ();
-    unlisten ~sw ();
+    unlisten ();
     unpoll ()
   in
   lazy (Core.create listen)
