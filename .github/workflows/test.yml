@@ -12,11 +12,8 @@ jobs:
         os:
           - macos-latest
         ocaml-version:
-          - 4.12.0
-          - 4.11.1
-          - 4.10.2
-          - 4.09.1
-          - 4.08.1
+          - 5.1.1
+          - 5.1.0
 
     runs-on: ${{ matrix.os }}
 

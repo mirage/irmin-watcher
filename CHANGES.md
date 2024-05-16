@@ -1,3 +1,7 @@
+### Unreleased
+
+- Move to Eio (#37, @patricoferris, @clecat)
+
 ### 0.5.1 (2026-04-24)
 
 - Use `_WIN32` and `MAX_PATH` on Windows to support MSVC (#34, @jonahbeckford)

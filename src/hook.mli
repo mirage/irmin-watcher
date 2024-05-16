@@ -20,7 +20,7 @@ val v :
   Watchdog.hook
 (** [v ~sw ~wait_for_changes ~dir] is the watchdog hook using [wait_for_changes]
     to detect filesystem updates in the directory [dir]. The polling
-    implemention just calls [Lwt_unix.sleep]. The switch is used for the forked
+    implemention just calls [Eio_unix.sleep]. The switch is used for the forked
     callback function. *)
 
 (*---------------------------------------------------------------------------
