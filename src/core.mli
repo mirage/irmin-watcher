@@ -37,19 +37,25 @@ module Dispatch : sig
   (** [clear t] clears the contents of the dispatch table [t]. All previous
       callbacks are discarded. *)
 
-  val stats : t -> dir:string -> int
+  val stats : t -> dir:Eio.Fs.dir_ty Eio.Path.t -> int
   (** [stats t ~dir] is the number of active callbacks registered for the
       directory [dir]. *)
 
-  val apply : t -> dir:string -> file:string -> unit
+  val apply :
+    t -> dir:Eio.Fs.dir_ty Eio.Path.t -> file:Eio.Fs.dir_ty Eio.Path.t -> unit
   (** [apply t ~dir ~file] calls [f file] for every callback [f] registered for
       the directory [dir]. *)
 
-  val add : t -> id:int -> dir:string -> (string -> unit) -> unit
+  val add :
+    t ->
+    id:int ->
+    dir:Eio.Fs.dir_ty Eio.Path.t ->
+    (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
+    unit
   (** [add t ~id ~dir f] adds a new callback [f] to the directory [dir], using
       the unique identifier [id]. *)
 
-  val remove : t -> id:int -> dir:string -> unit
+  val remove : t -> id:int -> dir:Eio.Fs.dir_ty Eio.Path.t -> unit
   (** [remove t ~id ~dir] removes the callback with ID [id] on the directory
       [dir]. *)
 
@@ -66,7 +72,7 @@ module Watchdog : sig
   val dispatch : t -> Dispatch.t
   (** [dispath t] is the table of [t]'s callback dispatch. *)
 
-  type hook = (string -> unit) -> unit -> unit
+  type hook = (Eio.Fs.dir_ty Eio.Path.t -> unit) -> unit -> unit
   (** The type for watchdog hook. *)
 
   val empty : unit -> t
@@ -75,24 +81,29 @@ module Watchdog : sig
   val clear : t -> unit
   (** [clear ()] stops all the currently active watchdogs. *)
 
-  val start : t -> dir:string -> hook -> unit
+  val start : t -> dir:Eio.Fs.dir_ty Eio.Path.t -> hook -> unit
   (** [start t ~dir h] adds a new callback hook on the directory [dir], starting
       a new watchdog if needed otherwise re-using the previous one. *)
 
-  val stop : t -> dir:string -> unit
+  val stop : t -> dir:Eio.Fs.dir_ty Eio.Path.t -> unit
   (** [stop t ~dir] stops the filesystem watchdog on directory [dir] (if any). *)
 
   val length : t -> int
   (** [length t] is the number of watchdog threads. *)
 end
 
-type hook = int -> string -> (string -> unit) -> unit -> unit
+type hook =
+  int ->
+  Eio.Fs.dir_ty Eio.Path.t ->
+  (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
+  unit ->
+  unit
 (** The type for Irmin.Watch hooks. *)
 
 type t
 (** The type for listeners. *)
 
-val create : (string -> Watchdog.hook) -> t
+val create : (Eio.Fs.dir_ty Eio.Path.t -> Watchdog.hook) -> t
 (** [create h] is the Irmin watcher using the update hook [h]. *)
 
 val watchdog : t -> Watchdog.t

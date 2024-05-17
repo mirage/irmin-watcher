@@ -8,20 +8,16 @@ let src = Logs.Src.create "irw-inotify" ~doc:"Irmin watcher using Inotify"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-let rec mkdir d =
+let mkdir d =
   let perm = 0o0700 in
-  try Unix.mkdir d perm with
-  | Unix.Unix_error (Unix.EEXIST, "mkdir", _) -> ()
-  | Unix.Unix_error (Unix.ENOENT, "mkdir", _) ->
-      mkdir (Filename.dirname d);
-      Unix.mkdir d perm
+  Eio.Path.mkdirs ~perm d
 
 let start_watch dir =
-  Log.debug (fun l -> l "start_watch %s" dir);
-  if not (Sys.file_exists dir) then mkdir dir;
+  Log.debug (fun l -> l "start_watch %a" Eio.Path.pp dir);
+  if Eio.Path.kind ~follow:false dir = `Not_found then mkdir dir;
   let i = Eio_inotify.create () in
   let u =
-    Eio_inotify.add_watch i dir
+    Eio_inotify.add_watch i (Eio.Path.native_exn dir)
       [ Inotify.S_Create; Inotify.S_Modify; Inotify.S_Move; Inotify.S_Delete ]
   in
   let stop () =
@@ -34,7 +30,9 @@ let listen ~sw dir i fn =
   let event_kinds (_, es, _, _) = es in
   let pp_kind = Fmt.of_to_string Inotify.string_of_event_kind in
   let path_of_event (_, _, _, p) =
-    match p with None -> dir | Some p -> Filename.concat dir p
+    match p with
+    | None -> Eio.Path.native_exn dir
+    | Some p -> Filename.concat (Eio.Path.native_exn dir) p
   in
   let rec iter i =
     match
@@ -68,7 +66,7 @@ let v ~sw =
           wait_for_changes ()
       | h :: t ->
           events := List.rev t;
-          `File h
+          `File Eio.Path.(dir / h)
     in
     let unlisten =
       listen ~sw dir i (fun path ->
