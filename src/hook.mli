@@ -10,13 +10,13 @@
 
 open Core
 
-type event = [ `Unknown | `File of string ]
+type event = [ `Unknown | `File of Eio.Fs.dir_ty Eio.Path.t ]
 (** The type for change event. *)
 
 val v :
   sw:Eio.Switch.t ->
   wait_for_changes:(unit -> event) ->
-  dir:string ->
+  dir:Eio.Fs.dir_ty Eio.Path.t ->
   Watchdog.hook
 (** [v ~sw ~wait_for_changes ~dir] is the watchdog hook using [wait_for_changes]
     to detect filesystem updates in the directory [dir]. The polling
