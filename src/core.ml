@@ -19,18 +19,6 @@ let stoppable ~sw t =
       `Stop_daemon);
   fun () -> Promise.resolve r (Ok ())
 
-external unix_realpath : string -> string = "irmin_watcher_unix_realpath"
-
-let realpath dir =
-  let ( / ) x y = match y with None -> x | Some y -> Filename.concat x y in
-  let rec aux dir file =
-    try unix_realpath dir / file
-    with Unix.Unix_error (Unix.ENOENT, _, _) ->
-      let file = Filename.basename dir / file in
-      aux (Filename.dirname dir) (Some file)
-  in
-  aux dir None
-
 module Digests = struct
   include Set.Make (struct
     type t = string * Digest.t
@@ -49,15 +37,17 @@ module Digests = struct
 end
 
 module Dispatch = struct
-  type t = (string, (int * (string -> unit)) list) Hashtbl.t
+  type t = (string, (int * (Eio.Fs.dir_ty Eio.Path.t -> unit)) list) Hashtbl.t
 
   let empty () : t = Hashtbl.create 10
   let clear t = Hashtbl.clear t
-  let stats t ~dir = try List.length (Hashtbl.find t dir) with Not_found -> 0
+
+  let stats t ~dir =
+    try List.length (Hashtbl.find t (snd dir)) with Not_found -> 0
 
   (* call all the callbacks on the file *)
   let apply t ~dir ~file =
-    let fns = try Hashtbl.find t dir with Not_found -> [] in
+    let fns = try Hashtbl.find t (snd dir) with Not_found -> [] in
     Fiber.List.iter
       (fun (id, f) ->
         Log.debug (fun f -> f "callback %d" id);
@@ -65,14 +55,15 @@ module Dispatch = struct
       fns
 
   let add t ~id ~dir fn =
-    let fns = try Hashtbl.find t dir with Not_found -> [] in
+    let fns = try Hashtbl.find t (snd dir) with Not_found -> [] in
     let fns = (id, fn) :: fns in
-    Hashtbl.replace t dir fns
+    Hashtbl.replace t (snd dir) fns
 
   let remove t ~id ~dir =
-    let fns = try Hashtbl.find t dir with Not_found -> [] in
+    let fns = try Hashtbl.find t (snd dir) with Not_found -> [] in
     let fns = List.filter (fun (x, _) -> x <> id) fns in
-    if fns = [] then Hashtbl.remove t dir else Hashtbl.replace t dir fns
+    if fns = [] then Hashtbl.remove t (snd dir)
+    else Hashtbl.replace t (snd dir) fns
 
   let length t = Hashtbl.fold (fun _ v acc -> acc + List.length v) t 0
 end
@@ -83,7 +74,7 @@ module Watchdog = struct
   let length t = Hashtbl.length t.t
   let dispatch t = t.d
 
-  type hook = (string -> unit) -> unit -> unit
+  type hook = (Eio.Fs.dir_ty Eio.Path.t -> unit) -> unit -> unit
 
   let empty () : t = { t = Hashtbl.create 10; d = Dispatch.empty () }
 
@@ -92,7 +83,8 @@ module Watchdog = struct
     Hashtbl.clear t;
     Dispatch.clear d
 
-  let watchdog t dir = try Some (Hashtbl.find t dir) with Not_found -> None
+  let watchdog t dir =
+    try Some (Hashtbl.find t (snd dir)) with Not_found -> None
 
   let start { t; d } ~dir listen =
     match watchdog t dir with
@@ -106,25 +98,35 @@ module Watchdog = struct
                to avoid avoid having too many wathdogs for [dir]. *)
             u ()
         | None ->
-            Log.debug (fun f -> f "Start watchdog for %s" dir);
-            Hashtbl.add t dir u)
+            Log.debug (fun f -> f "Start watchdog for %a" Eio.Path.pp dir);
+            Hashtbl.add t (snd dir) u)
 
   let stop { t; d } ~dir =
     match watchdog t dir with
     | None -> assert (Dispatch.stats d ~dir = 0)
     | Some stop ->
         if Dispatch.stats d ~dir <> 0 then
-          Log.debug (fun f -> f "Active allback are registered for %s" dir)
+          Log.debug (fun f ->
+              f "Active allback are registered for %a" Eio.Path.pp dir)
         else (
-          Log.debug (fun f -> f "Stop watchdog for %s" dir);
-          Hashtbl.remove t dir;
+          Log.debug (fun f -> f "Stop watchdog for %a" Eio.Path.pp dir);
+          Hashtbl.remove t (snd dir);
           stop ())
 end
 
-type hook = int -> string -> (string -> unit) -> unit -> unit
+type hook =
+  int ->
+  Eio.Fs.dir_ty Eio.Path.t ->
+  (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
+  unit ->
+  unit
 
 type t = {
-  mutable listen : int -> string -> (string -> unit) -> unit;
+  mutable listen :
+    int ->
+    Eio.Fs.dir_ty Eio.Path.t ->
+    (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
+    unit;
   mutable stop : unit -> unit;
   watchdog : Watchdog.t;
 }
@@ -139,7 +141,6 @@ let create listen =
   let watchdog = Watchdog.empty () in
   let t = { listen = (fun _ _ _ -> ()); stop = (fun _ -> ()); watchdog } in
   let listen id dir fn =
-    let dir = realpath dir in
     let d = Watchdog.dispatch watchdog in
     Dispatch.add d ~id ~dir fn;
     Watchdog.start watchdog ~dir (listen dir);
