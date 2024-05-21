@@ -14,6 +14,7 @@ let create_flags = Fsevents.CreateFlags.detailed_interactive
 let run_loop_mode = Cf.RunLoop.Mode.Default
 
 let start_runloop dir =
+  let dir = Eio.Path.native_exn dir in
   Log.debug (fun l -> l "start_runloop %s" dir);
   let watcher = Fsevents_lwt.create 0. create_flags [ dir ] in
   let stream = Fsevents_lwt.stream watcher in
@@ -34,13 +35,13 @@ let start_runloop dir =
   in
   (stream, stop_scheduler)
 
-let listen ~sw stream fn =
+let listen ~sw dir stream fn =
   let path_of_event { Fsevents_lwt.path; _ } = path in
   let iter () =
     Lwt_stream.iter_s
       (fun e ->
-        let path = path_of_event e in
-        Log.debug (fun l -> l "fsevents: %s" path);
+        let path = Eio.Path.(dir / path_of_event e) in
+        Log.debug (fun l -> l "fsevents: %a" Eio.Path.pp path);
         fn @@ path)
       stream
   in
@@ -66,7 +67,7 @@ let v ~sw =
     in
     let wait_for_changes () = Lwt_eio.run_lwt wait_for_changes in
     let unlisten =
-      listen ~sw stream (fun path ->
+      listen ~sw dir stream (fun path ->
           events := path :: !events;
           Lwt_condition.signal cond ();
           Lwt.return_unit)

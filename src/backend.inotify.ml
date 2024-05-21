@@ -30,16 +30,15 @@ let listen ~sw dir i fn =
   let event_kinds (_, es, _, _) = es in
   let pp_kind = Fmt.of_to_string Inotify.string_of_event_kind in
   let path_of_event (_, _, _, p) =
-    match p with
-    | None -> Eio.Path.native_exn dir
-    | Some p -> Filename.concat (Eio.Path.native_exn dir) p
+    match p with None -> dir | Some p -> Eio.Path.(dir / p)
   in
   let rec iter i =
     match
       let e = Eio_inotify.read i in
       let path = path_of_event e in
       let es = event_kinds e in
-      Log.debug (fun l -> l "inotify: %s %a" path Fmt.(Dump.list pp_kind) es);
+      Log.debug (fun l ->
+          l "inotify: %a %a" Eio.Path.pp path Fmt.(Dump.list pp_kind) es);
       fn path
     with
     | () -> iter i
@@ -66,7 +65,7 @@ let v ~sw =
           wait_for_changes ()
       | h :: t ->
           events := List.rev t;
-          `File Eio.Path.(dir / h)
+          `File h
     in
     let unlisten =
       listen ~sw dir i (fun path ->
