@@ -10,13 +10,18 @@
 
 open Core
 
-type event = [ `Unknown | `File of string ]
+type event = [ `Unknown | `File of Eio.Fs.dir_ty Eio.Path.t ]
 (** The type for change event. *)
 
-val v : wait_for_changes:(unit -> event Lwt.t) -> dir:string -> Watchdog.hook
-(** [v ~wait_for_changes ~dir] is the watchdog hook using [wait_for_changes] to
-    detect filesystem updates in the directory [dir]. The polling implemention
-    just calls [Lwt_unix.sleep]. *)
+val v :
+  sw:Eio.Switch.t ->
+  wait_for_changes:(unit -> event) ->
+  dir:Eio.Fs.dir_ty Eio.Path.t ->
+  Watchdog.hook
+(** [v ~sw ~wait_for_changes ~dir] is the watchdog hook using [wait_for_changes]
+    to detect filesystem updates in the directory [dir]. The polling
+    implemention just calls [Eio_unix.sleep]. The switch is used for the forked
+    callback function. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

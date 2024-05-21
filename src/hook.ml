@@ -4,93 +4,88 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-open Lwt.Infix
-open Astring
+open Eio
 module Digests = Core.Digests
 
-let ( / ) = Filename.concat
-
+let ( / ) = Eio.Path.( / )
 let src = Logs.Src.create "irw-hook" ~doc:"Irmin watcher shared code"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let list_files kind dir =
-  if Sys.file_exists dir && Sys.is_directory dir then
-    let d = Sys.readdir dir in
-    let d = Array.to_list d in
-    let d = List.map (Filename.concat dir) d in
+  if Eio.Path.is_directory dir then
+    let d = Eio.Path.read_dir dir in
+    let d = List.map (fun p -> dir / p) d in
     let d = List.filter kind d in
-    let d = List.sort String.compare d in
-    Lwt.return d
-  else Lwt.return_nil
+    d
+  else []
 
-let directories dir =
-  list_files (fun f -> try Sys.is_directory f with Sys_error _ -> false) dir
-
-let files dir =
-  list_files
-    (fun f -> try not (Sys.is_directory f) with Sys_error _ -> false)
-    dir
+let directories dir = list_files Eio.Path.is_directory dir
+let files dir = list_files Eio.Path.is_file dir
 
 let rec_files dir =
   let rec aux accu dir =
-    directories dir >>= fun ds ->
-    files dir >>= fun fs -> Lwt_list.fold_left_s aux (fs @ accu) ds
+    let ds = directories dir in
+    let fs = files dir in
+    List.fold_left aux (fs @ accu) ds
   in
   aux [] dir
 
-let read_file ~prefix f =
+let read_file f =
   try
-    if (not (Sys.file_exists f)) || Sys.is_directory f then None
+    if not (Eio.Path.is_file f) then None
     else
-      let r = String.with_range ~first:(String.length prefix) f in
-      Some (r, Digest.file f)
+      let file = Eio.Path.native_exn f in
+      Some (f, Digest.file file)
   with ex ->
-    Log.info (fun fm -> fm "read_file(%s): %a" f Fmt.exn ex);
+    Log.info (fun fm -> fm "read_file(%a): %a" Eio.Path.pp f Fmt.exn ex);
     None
 
 let read_files dir =
-  rec_files dir >|= fun new_files ->
-  let prefix = dir / "" in
+  let new_files = rec_files dir in
   List.fold_left
     (fun acc f ->
-      match read_file ~prefix f with None -> acc | Some d -> Digests.add d acc)
+      match read_file f with
+      | None -> acc
+      | Some (path, d) -> Digests.add (Eio.Path.native_exn path, d) acc)
     Digests.empty new_files
 
-type event = [ `Unknown | `File of string ]
+type event = [ `Unknown | `File of Eio.Fs.dir_ty Eio.Path.t ]
 
 let rec poll n ~callback ~wait_for_changes dir files (event : event) =
-  (match event with
-  | `Unknown -> read_files dir
-  | `File f -> (
-      let prefix = dir / "" in
-      let short_f = String.with_range ~first:(String.length prefix) f in
-      let files = Digests.filter (fun (x, _) -> x <> short_f) files in
-      match read_file ~prefix f with
-      | None -> Lwt.return files
-      | Some d -> Lwt.return (Digests.add d files)))
-  >>= fun new_files ->
+  let new_files =
+    match event with
+    | `Unknown -> read_files dir
+    | `File f -> (
+        let files =
+          Digests.filter (fun (x, _) -> x <> Eio.Path.native_exn f) files
+        in
+        match read_file f with
+        | None -> files
+        | Some (path, d) -> Digests.add (Eio.Path.native_exn path, d) files)
+  in
   Log.debug (fun l ->
       l "files=%a new_files=%a" Digests.pp files Digests.pp new_files);
   let diff = Digests.sdiff files new_files in
   let process () =
-    if Digests.is_empty diff then Lwt.return_unit
+    if Digests.is_empty diff then ()
     else (
-      Log.debug (fun f -> f "[%d] polling %s: diff:%a" n dir Digests.pp diff);
+      Log.debug (fun f ->
+          f "[%d] polling %a: diff:%a" n Eio.Path.pp dir Digests.pp diff);
       let files = Digests.files diff in
-      Lwt_list.iter_p callback files)
+      Fiber.List.iter (fun file -> callback (dir / file)) files)
   in
-  process () >>= fun () ->
-  wait_for_changes () >>= fun event ->
+  process ();
+  let event = wait_for_changes () in
   poll n ~callback ~wait_for_changes dir new_files event
 
 let id = ref 0
 
-let v ~wait_for_changes ~dir callback =
+let v ~sw ~wait_for_changes ~dir callback =
   let n = !id in
   incr id;
-  read_files dir >|= fun files ->
-  Core.stoppable (fun () ->
+  let files = read_files dir in
+  Core.stoppable ~sw (fun () ->
       poll n ~callback ~wait_for_changes dir files `Unknown)
 
 (*---------------------------------------------------------------------------

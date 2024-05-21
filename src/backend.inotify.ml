@@ -4,79 +4,78 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-open Lwt.Infix
-
 let src = Logs.Src.create "irw-inotify" ~doc:"Irmin watcher using Inotify"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-let rec mkdir d =
+let mkdir d =
   let perm = 0o0700 in
-  try Unix.mkdir d perm with
-  | Unix.Unix_error (Unix.EEXIST, "mkdir", _) -> ()
-  | Unix.Unix_error (Unix.ENOENT, "mkdir", _) ->
-      mkdir (Filename.dirname d);
-      Unix.mkdir d perm
+  Eio.Path.mkdirs ~perm d
 
 let start_watch dir =
-  Log.debug (fun l -> l "start_watch %s" dir);
-  if not (Sys.file_exists dir) then mkdir dir;
-  Lwt_inotify.create () >>= fun i ->
-  Lwt_inotify.add_watch i dir
-    [ Inotify.S_Create; Inotify.S_Modify; Inotify.S_Move; Inotify.S_Delete ]
-  >|= fun u ->
-  let stop () = Lwt_inotify.rm_watch i u >>= fun () -> Lwt_inotify.close i in
+  Log.debug (fun l -> l "start_watch %a" Eio.Path.pp dir);
+  if Eio.Path.kind ~follow:false dir = `Not_found then mkdir dir;
+  let i = Eio_inotify.create () in
+  let u =
+    Eio_inotify.add_watch i (Eio.Path.native_exn dir)
+      [ Inotify.S_Create; Inotify.S_Modify; Inotify.S_Move; Inotify.S_Delete ]
+  in
+  let stop () =
+    Eio_inotify.rm_watch i u;
+    Eio_inotify.close i
+  in
   (i, stop)
 
-let listen dir i fn =
+let listen ~sw dir i fn =
   let event_kinds (_, es, _, _) = es in
   let pp_kind = Fmt.of_to_string Inotify.string_of_event_kind in
   let path_of_event (_, _, _, p) =
-    match p with None -> dir | Some p -> Filename.concat dir p
+    match p with None -> dir | Some p -> Eio.Path.(dir / p)
   in
   let rec iter i =
-    Lwt.try_bind
-      (fun () ->
-        Lwt_inotify.read i >>= fun e ->
-        let path = path_of_event e in
-        let es = event_kinds e in
-        Log.debug (fun l -> l "inotify: %s %a" path Fmt.(Dump.list pp_kind) es);
-        fn path;
-        Lwt.return_unit)
-      (fun () -> iter i)
-      (function
-        | Unix.Unix_error (Unix.EBADF, _, _) ->
-            Lwt.return_unit (* i has just been closed by {!stop} *)
-        | e -> Lwt.fail e)
+    match
+      let e = Eio_inotify.read i in
+      let path = path_of_event e in
+      let es = event_kinds e in
+      Log.debug (fun l ->
+          l "inotify: %a %a" Eio.Path.pp path Fmt.(Dump.list pp_kind) es);
+      fn path
+    with
+    | () -> iter i
+    | exception e -> raise e
   in
-  Core.stoppable (fun () -> iter i)
+  Core.stoppable ~sw (fun () -> iter i)
 
 (* Note: we use Inotify to detect any change, and we re-read the full
    tree on every change (so very similar to active polling, but
    blocking on incoming Inotify events instead of sleeping). We could
    probably do better, but at the moment it is more robust to do so,
    to avoid possible duplicated events. *)
-let v =
+let v ~sw =
+  let open Eio in
   let listen dir f =
     Log.info (fun l -> l "Inotify mode");
     let events = ref [] in
-    let cond = Lwt_condition.create () in
-    start_watch dir >>= fun (i, stop_watch) ->
+    let cond = Condition.create () in
+    let i, stop_watch = start_watch dir in
     let rec wait_for_changes () =
       match List.rev !events with
-      | [] -> Lwt_condition.wait cond >>= wait_for_changes
+      | [] ->
+          Condition.await_no_mutex cond;
+          wait_for_changes ()
       | h :: t ->
           events := List.rev t;
-          Lwt.return (`File h)
+          `File h
     in
     let unlisten =
-      listen dir i (fun path ->
+      listen ~sw dir i (fun path ->
           events := path :: !events;
-          Lwt_condition.signal cond ())
+          Condition.broadcast cond)
     in
-    Hook.v ~wait_for_changes ~dir f >|= fun unpoll () ->
-    stop_watch () >>= fun () ->
-    unlisten () >>= fun () -> unpoll ()
+    Hook.v ~sw ~wait_for_changes ~dir f |> fun unpoll () ->
+    stop_watch ();
+    unlisten ();
+    unpoll ()
   in
   lazy (Core.create listen)
 

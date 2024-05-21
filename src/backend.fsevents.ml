@@ -11,51 +11,53 @@ let src = Logs.Src.create "irw-fsevents" ~doc:"Irmin watcher using FSevents"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let create_flags = Fsevents.CreateFlags.detailed_interactive
-
 let run_loop_mode = Cf.RunLoop.Mode.Default
 
 let start_runloop dir =
+  let dir = Eio.Path.native_exn dir in
   Log.debug (fun l -> l "start_runloop %s" dir);
   let watcher = Fsevents_lwt.create 0. create_flags [ dir ] in
   let stream = Fsevents_lwt.stream watcher in
   let event_stream = Fsevents_lwt.event_stream watcher in
-  Cf_lwt.RunLoop.run_thread (fun runloop ->
-      Fsevents.schedule_with_run_loop event_stream runloop run_loop_mode;
-      if not (Fsevents.start event_stream) then
-        prerr_endline "failed to start FSEvents stream")
-  >|= fun _scheduler ->
+  let _scheduler =
+    Lwt_eio.run_lwt @@ fun () ->
+    Cf_lwt.RunLoop.run_thread (fun runloop ->
+        Fsevents.schedule_with_run_loop event_stream runloop run_loop_mode;
+        if not (Fsevents.start event_stream) then
+          prerr_endline "failed to start FSEvents stream")
+  in
   (* FIXME: should probably do something with the scheduler *)
   let stop_scheduler () =
-    Fsevents_lwt.flush watcher >|= fun () ->
+    (Lwt_eio.run_lwt @@ fun () -> Fsevents_lwt.flush watcher);
     Fsevents_lwt.stop watcher;
     Fsevents_lwt.invalidate watcher;
     Fsevents_lwt.release watcher
   in
   (stream, stop_scheduler)
 
-let listen stream fn =
+let listen ~sw dir stream fn =
   let path_of_event { Fsevents_lwt.path; _ } = path in
   let iter () =
     Lwt_stream.iter_s
       (fun e ->
-        let path = path_of_event e in
-        Log.debug (fun l -> l "fsevents: %s" path);
+        let path = Eio.Path.(dir / path_of_event e) in
+        Log.debug (fun l -> l "fsevents: %a" Eio.Path.pp path);
         fn @@ path)
       stream
   in
-  Core.stoppable iter
+  Core.stoppable ~sw (fun () -> Lwt_eio.run_lwt iter)
 
 (* Note: we use FSevents to detect any change, and we re-read the full
    tree on every change (so very similar to active polling, but
    blocking on incoming FSevents instead of sleeping). We could
    probably do better, but at the moment it is more robust to do so,
    to avoid possible duplicated events. *)
-let v =
+let v ~sw =
   let listen dir f =
     Log.info (fun l -> l "FSevents mode");
     let events = ref [] in
     let cond = Lwt_condition.create () in
-    start_runloop dir >>= fun (stream, stop_runloop) ->
+    let stream, stop_runloop = start_runloop dir in
     let rec wait_for_changes () =
       match List.rev !events with
       | [] -> Lwt_condition.wait cond >>= wait_for_changes
@@ -63,15 +65,17 @@ let v =
           events := List.rev t;
           Lwt.return (`File h)
     in
+    let wait_for_changes () = Lwt_eio.run_lwt wait_for_changes in
     let unlisten =
-      listen stream (fun path ->
+      listen ~sw dir stream (fun path ->
           events := path :: !events;
           Lwt_condition.signal cond ();
           Lwt.return_unit)
     in
-    Hook.v ~wait_for_changes ~dir f >|= fun unpoll () ->
-    stop_runloop () >>= fun () ->
-    unlisten () >>= fun () -> unpoll ()
+    Hook.v ~sw ~wait_for_changes ~dir f |> fun unpoll () ->
+    stop_runloop ();
+    unlisten ();
+    unpoll ()
   in
   lazy (Core.create listen)
 

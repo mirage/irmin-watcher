@@ -6,18 +6,18 @@
  (public_name irmin-watcher)
  (libraries
   fmt
-  lwt
   logs
   astring
+  eio.unix
   (select
    backend.ml
    from
-   (cf-lwt fsevents-lwt -> backend.fsevents.ml)
-   (inotify.lwt -> backend.inotify.ml)
-   (lwt.unix -> backend.polling.ml))
+   (cf-lwt fsevents-lwt lwt_eio -> backend.fsevents.ml)
+   (inotify-eio -> backend.inotify.ml)
+   (eio -> backend.polling.ml))
   (select
    backend.mli
    from
-   (cf-lwt fsevents-lwt -> backend.fsevents.mli)
-   (inotify.lwt -> backend.inotify.mli)
-   (lwt.unix -> backend.polling.mli))))
+   (cf-lwt fsevents-lwt lwt_eio -> backend.fsevents.mli)
+   (inotify-eio -> backend.inotify.mli)
+   (eio -> backend.polling.mli))))
