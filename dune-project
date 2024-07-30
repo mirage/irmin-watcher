@@ -50,4 +50,6 @@
   astring
   fsevents-lwt
   (lwt_eio
-   (= :os "macos"))))
+   (or
+    :with-test
+    (= :os "macos")))))
