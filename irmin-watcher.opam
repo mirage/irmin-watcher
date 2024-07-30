@@ -30,7 +30,7 @@ depends: [
   "fmt"
   "astring"
   "fsevents-lwt"
-  "lwt_eio" {os = "macos"}
+  "lwt_eio" {with-test | os = "macos"}
   "odoc" {with-doc}
 ]
 build: [
