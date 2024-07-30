@@ -15,7 +15,7 @@ val with_delay : sw:Eio.Switch.t -> float -> t
     [p] is modified. Return a function to call to remove the hook. Active
     polling is done every [delay] seconds. *)
 
-val v : sw:Eio.Switch.t -> t Lazy.t
+val v : sw:Eio.Switch.t -> t
 (** [v] is [with_delay !default_polling_time]. *)
 
 val mode : [ `Polling ]

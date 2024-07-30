@@ -33,16 +33,13 @@ let listen ~sw dir i fn =
     match p with None -> dir | Some p -> Eio.Path.(dir / p)
   in
   let rec iter i =
-    match
-      let e = Eio_inotify.read i in
-      let path = path_of_event e in
-      let es = event_kinds e in
-      Log.debug (fun l ->
-          l "inotify: %a %a" Eio.Path.pp path Fmt.(Dump.list pp_kind) es);
-      fn path
-    with
-    | () -> iter i
-    | exception e -> raise e
+    let e = Eio_inotify.read i in
+    let path = path_of_event e in
+    let es = event_kinds e in
+    Log.debug (fun l ->
+        l "inotify: %a %a" Eio.Path.pp path Fmt.(Dump.list pp_kind) es);
+    fn path;
+    iter i
   in
   Core.stoppable ~sw (fun () -> iter i)
 
@@ -77,7 +74,7 @@ let v ~sw =
     unlisten ();
     unpoll ()
   in
-  lazy (Core.create listen)
+  Core.create listen
 
 let mode = `Inotify
 

@@ -8,7 +8,7 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
-val v : sw:Eio.Switch.t -> Core.t Lazy.t
+val v : sw:Eio.Switch.t -> Core.t
 (** [v id p f] is the hook calling [f] everytime a sub-path of [p] is modified.
     Return a function to call to remove the hook. Use inofity to be notified on
     filesystem changes. *)

@@ -36,7 +36,7 @@ let read_file f =
     if not (Eio.Path.is_file f) then None
     else
       let file = Eio.Path.native_exn f in
-      Some (f, Digest.file file)
+      Some (Digest.file file)
   with ex ->
     Log.info (fun fm -> fm "read_file(%a): %a" Eio.Path.pp f Fmt.exn ex);
     None
@@ -44,10 +44,12 @@ let read_file f =
 let read_files dir =
   let new_files = rec_files dir in
   List.fold_left
-    (fun acc f ->
-      match read_file f with
+    (fun acc path ->
+      match read_file path with
       | None -> acc
-      | Some (path, d) -> Digests.add (Eio.Path.native_exn path, d) acc)
+      | Some d ->
+          let nat_dir = Eio.Path.native_exn path in
+          Digests.add (nat_dir, d) acc)
     Digests.empty new_files
 
 type event = [ `Unknown | `File of Eio.Fs.dir_ty Eio.Path.t ]
@@ -56,13 +58,12 @@ let rec poll n ~callback ~wait_for_changes dir files (event : event) =
   let new_files =
     match event with
     | `Unknown -> read_files dir
-    | `File f -> (
-        let files =
-          Digests.filter (fun (x, _) -> x <> Eio.Path.native_exn f) files
-        in
-        match read_file f with
+    | `File path -> (
+        let nat_dir = Eio.Path.native_exn path in
+        let files = Digests.filter (fun (x, _) -> x <> nat_dir) files in
+        match read_file path with
         | None -> files
-        | Some (path, d) -> Digests.add (Eio.Path.native_exn path, d) files)
+        | Some d -> Digests.add (nat_dir, d) files)
   in
   Log.debug (fun l ->
       l "files=%a new_files=%a" Digests.pp files Digests.pp new_files);

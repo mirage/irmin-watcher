@@ -22,7 +22,7 @@ let v ~sw =
   let wait_for_changes () =
     Eio_unix.sleep !Core.default_polling_time |> fun () -> `Unknown
   in
-  lazy (Core.create (listen ~sw ~wait_for_changes))
+  Core.create (listen ~sw ~wait_for_changes)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
