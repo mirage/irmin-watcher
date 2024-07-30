@@ -77,7 +77,7 @@ let v ~sw =
     unlisten ();
     unpoll ()
   in
-  lazy (Core.create listen)
+  Core.create listen
 
 let mode = `FSEvents
 

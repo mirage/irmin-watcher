@@ -20,7 +20,8 @@ depends: [
   "ocaml" {>= "5.1.0"}
   "alcotest" {with-test}
   "mtime" {with-test & >= "2.0.0"}
-  "inotify" {os = "linux"}
+  "inotify" {>= "2.6" & os = "linux"}
+  "inotify-eio" {>= "2.6" & os = "linux"}
   "cf-lwt" {>= "0.4"}
   "lwt"
   "eio" {>= "1.0"}
@@ -29,7 +30,7 @@ depends: [
   "fmt"
   "astring"
   "fsevents-lwt"
-  "lwt_eio"
+  "lwt_eio" {os = "macos"}
   "odoc" {with-doc}
 ]
 build: [
@@ -47,6 +48,3 @@ build: [
   ]
 ]
 dev-repo: "git+https://github.com/mirage/irmin-watcher.git"
-pin-depends: [
-  [ "inotify.dev" "git+https://github.com/whitequark/ocaml-inotify#b9cadad68ef3f4965853ea693171adf1d18c0599" ]
-]

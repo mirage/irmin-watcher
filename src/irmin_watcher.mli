@@ -12,7 +12,13 @@ val mode : [ `FSEvents | `Inotify | `Polling ]
 
 type stats = { watchdogs : int; dispatches : int }
 
-val hook : sw:Eio.Switch.t -> Core.hook
+val hook :
+  sw:Eio.Switch.t ->
+  int ->
+  Eio.Fs.dir_ty Eio.Path.t ->
+  (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
+  unit ->
+  unit
 (** [hook ~sw id p f] is the listen hook calling [f] everytime a sub-path of [p]
     is modified. Return a function to call to remove the hook. Default to
     polling if no better solution is available. FSevents and Inotify backends

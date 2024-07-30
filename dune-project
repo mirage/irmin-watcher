@@ -29,7 +29,13 @@
     :with-test
     (>= "2.0.0")))
   (inotify
-   (= :os "linux"))
+   (and
+    (>= "2.6")
+    (= :os "linux")))
+  (inotify-eio
+   (and
+    (>= "2.6")
+    (= :os "linux")))
   (cf-lwt
    (>= "0.4"))
   lwt
@@ -43,4 +49,5 @@
   fmt
   astring
   fsevents-lwt
-  lwt_eio))
+  (lwt_eio
+   (= :os "macos"))))

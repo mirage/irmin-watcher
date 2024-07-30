@@ -15,9 +15,9 @@ module Log = (val Logs.src_log src : Logs.LOG)
 let stoppable ~sw t =
   let p, r = Promise.create () in
   Fiber.fork_daemon ~sw (fun () ->
-      Fiber.first (fun () -> Promise.await_exn p) (fun () -> t ());
+      Fiber.first (fun () -> Promise.await p) t;
       `Stop_daemon);
-  fun () -> Promise.resolve r (Ok ())
+  Promise.resolve r
 
 module Digests = struct
   include Set.Make (struct
@@ -43,11 +43,13 @@ module Dispatch = struct
   let clear t = Hashtbl.clear t
 
   let stats t ~dir =
-    try List.length (Hashtbl.find t (snd dir)) with Not_found -> 0
+    let nat_dir = Eio.Path.native_exn dir in
+    try List.length (Hashtbl.find t nat_dir) with Not_found -> 0
 
   (* call all the callbacks on the file *)
   let apply t ~dir ~file =
-    let fns = try Hashtbl.find t (snd dir) with Not_found -> [] in
+    let nat_dir = Eio.Path.native_exn dir in
+    let fns = try Hashtbl.find t nat_dir with Not_found -> [] in
     Fiber.List.iter
       (fun (id, f) ->
         Log.debug (fun f -> f "callback %d" id);
@@ -55,15 +57,16 @@ module Dispatch = struct
       fns
 
   let add t ~id ~dir fn =
-    let fns = try Hashtbl.find t (snd dir) with Not_found -> [] in
+    let nat_dir = Eio.Path.native_exn dir in
+    let fns = try Hashtbl.find t nat_dir with Not_found -> [] in
     let fns = (id, fn) :: fns in
-    Hashtbl.replace t (snd dir) fns
+    Hashtbl.replace t nat_dir fns
 
   let remove t ~id ~dir =
-    let fns = try Hashtbl.find t (snd dir) with Not_found -> [] in
+    let nat_dir = Eio.Path.native_exn dir in
+    let fns = try Hashtbl.find t nat_dir with Not_found -> [] in
     let fns = List.filter (fun (x, _) -> x <> id) fns in
-    if fns = [] then Hashtbl.remove t (snd dir)
-    else Hashtbl.replace t (snd dir) fns
+    if fns = [] then Hashtbl.remove t nat_dir else Hashtbl.replace t nat_dir fns
 
   let length t = Hashtbl.fold (fun _ v acc -> acc + List.length v) t 0
 end
@@ -84,7 +87,8 @@ module Watchdog = struct
     Dispatch.clear d
 
   let watchdog t dir =
-    try Some (Hashtbl.find t (snd dir)) with Not_found -> None
+    let nat_dir = Eio.Path.native_exn dir in
+    try Some (Hashtbl.find t nat_dir) with Not_found -> None
 
   let start { t; d } ~dir listen =
     match watchdog t dir with
@@ -99,7 +103,8 @@ module Watchdog = struct
             u ()
         | None ->
             Log.debug (fun f -> f "Start watchdog for %a" Eio.Path.pp dir);
-            Hashtbl.add t (snd dir) u)
+            let nat_dir = Eio.Path.native_exn dir in
+            Hashtbl.add t nat_dir u)
 
   let stop { t; d } ~dir =
     match watchdog t dir with
@@ -107,10 +112,11 @@ module Watchdog = struct
     | Some stop ->
         if Dispatch.stats d ~dir <> 0 then
           Log.debug (fun f ->
-              f "Active allback are registered for %a" Eio.Path.pp dir)
+              f "Active callbacks are registered for %a" Eio.Path.pp dir)
         else (
           Log.debug (fun f -> f "Stop watchdog for %a" Eio.Path.pp dir);
-          Hashtbl.remove t (snd dir);
+          let nat_dir = Eio.Path.native_exn dir in
+          Hashtbl.remove t nat_dir;
           stop ())
 end
 

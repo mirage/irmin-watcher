@@ -1,3 +1,0 @@
-pin-depends: [
-  [ "inotify.dev" "git+https://github.com/whitequark/ocaml-inotify#b9cadad68ef3f4965853ea693171adf1d18c0599" ]
-]
