@@ -56,44 +56,48 @@ let poll ~fs ~mkdir:m i () =
               e))
   in
 
-  write ~sw ~fs "foo" ("foo" ^ string_of_int i);
-  let events = List.map Eio.Path.native_exn (wait ()) in
-  Alcotest.(check (slist string String.compare))
-    "update foo"
-    [ Eio.Path.(native_exn @@ (tmpdir / "foo")) ]
-    events;
+  let testable = Alcotest.(slist string String.compare) in
+  let rec wait_and_check_events ?(n = 1) s expected last_expected =
+    let events = List.map Eio.Path.native_exn (wait ~n ()) in
+    if Alcotest.equal testable expected events then ()
+    else if Alcotest.equal testable last_expected events then
+      wait_and_check_events s expected last_expected
+    else Alcotest.check testable s expected events
+  in
 
+  let last_expected, expected =
+    ([], [ Eio.Path.(native_exn @@ (tmpdir / "foo")) ])
+  in
+  write ~sw ~fs "foo" ("foo" ^ string_of_int i);
+  wait_and_check_events "update foo" expected last_expected;
+
+  let last_expected, expected =
+    (expected, [ Eio.Path.(native_exn @@ (tmpdir / "foo")) ])
+  in
   remove ~fs "foo";
-  let events = List.map Eio.Path.native_exn (wait ()) in
-  Alcotest.(check (slist string String.compare))
-    "remove foo"
-    [ Eio.Path.(native_exn @@ (tmpdir / "foo")) ]
-    events;
+  wait_and_check_events "remove foo" expected last_expected;
 
+  let last_expected, expected =
+    (expected, [ Eio.Path.(native_exn @@ (tmpdir / "foo")) ])
+  in
   write ~sw ~fs "foo" ("foo" ^ string_of_int i);
-  let events = List.map Eio.Path.native_exn (wait ()) in
-  Alcotest.(check (slist string String.compare))
-    "create foo"
-    [ Eio.Path.(native_exn @@ (tmpdir / "foo")) ]
-    events;
+  wait_and_check_events "create foo" expected last_expected;
 
+  let last_expected, expected =
+    (expected, [ Eio.Path.(native_exn @@ (tmpdir / "bar")) ])
+  in
   write ~sw ~fs "bar" ("bar" ^ string_of_int i);
-  let events = List.map Eio.Path.native_exn (wait ()) in
-  Alcotest.(check (slist string String.compare))
-    "create bar"
-    [ Eio.Path.(native_exn @@ (tmpdir / "bar")) ]
-    events;
+  wait_and_check_events "create bar" expected last_expected;
 
+  let last_expected, expected =
+    ( expected,
+      [
+        Eio.Path.(native_exn @@ (tmpdir / "bar"));
+        Eio.Path.(native_exn @@ (tmpdir / "barx"));
+      ] )
+  in
   move ~fs "bar" "barx";
-  let events = List.map Eio.Path.native_exn (wait ~n:2 ()) in
-  Alcotest.(check (slist string String.compare))
-    "move bar"
-    [
-      Eio.Path.(native_exn @@ (tmpdir / "bar"));
-      Eio.Path.(native_exn @@ (tmpdir / "barx"));
-    ]
-    events;
-
+  wait_and_check_events ~n:2 "move bar" expected last_expected;
   unwatch ()
 
 let random_letter () = Char.(chr @@ (code 'a' + Random.int 26))
