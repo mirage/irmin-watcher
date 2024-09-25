@@ -20,7 +20,9 @@ val hook :
   unit ->
   unit
 (** [hook ~sw id p f] is the listen hook calling [f] everytime a sub-path of [p]
-    is modified. Return a function to call to remove the hook. Default to
+    is modified. [id] will be used to make a distinction between hooks to a same
+    file and should therefore be a unique identifier.
+    Return a function to call to remove the hook. Default to
     polling if no better solution is available. FSevents and Inotify backends
     are available. *)
 

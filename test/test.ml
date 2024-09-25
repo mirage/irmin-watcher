@@ -25,7 +25,7 @@ let remove ~fs f =
   try Eio.Path.unlink Eio.Path.(tmpdir fs / f)
   with e -> Alcotest.fail (Printexc.to_string e)
 
-let poll ~fs ~mkdir:m i () =
+let poll ~fs ~clock ~mkdir:m i () =
   Eio.Switch.run @@ fun sw ->
   let tmpdir = tmpdir fs in
   if m then mkdir tmpdir;
@@ -38,66 +38,69 @@ let poll ~fs ~mkdir:m i () =
   in
   let reset () = events := [] in
   let rec wait ?n () =
-    match !events with
-    | [] ->
-        Condition.await_no_mutex cond;
-        wait ?n ()
-    | e -> (
-        match n with
-        | None ->
-            reset ();
-            e
-        | Some n ->
-            if List.length e < n then (
-              Condition.await_no_mutex cond;
-              wait ~n ())
-            else (
-              reset ();
-              e))
+    Eio.Time.with_timeout_exn clock 60. (fun () ->
+        match !events with
+        | [] ->
+            Condition.await_no_mutex cond;
+            wait ?n ()
+        | e -> (
+            match n with
+            | None ->
+                reset ();
+                e
+            | Some n ->
+                if List.length e < n then (
+                  Condition.await_no_mutex cond;
+                  wait ~n ())
+                else (
+                  reset ();
+                  e)))
   in
 
-  let testable = Alcotest.(slist string String.compare) in
-  let rec wait_and_check_events ?(n = 1) s expected last_expected =
-    let events = List.map Eio.Path.native_exn (wait ~n ()) in
-    if Alcotest.equal testable expected events then ()
-    else if Alcotest.equal testable last_expected events then
-      wait_and_check_events s expected last_expected
-    else Alcotest.check testable s expected events
+  let expected = Hashtbl.create 10 in
+  let wait_and_check_events ?(n = 1) s =
+    let rec loop n =
+      let events = List.map Eio.Path.native_exn (wait ~n ()) in
+      let n =
+        List.fold_left
+          (fun n event ->
+            match Hashtbl.find_opt expected event with
+            | Some true ->
+                Fmt.pr "BOOP@.";
+                Hashtbl.replace expected event false;
+                n
+            | Some false -> n + 1
+            | None ->
+                Alcotest.check Alcotest.reject s () ();
+                assert false)
+          0 events
+      in
+      if n > 0 then loop n
+    in
+    loop n;
+    Hashtbl.iter (fun _ r -> Alcotest.check Alcotest.bool s false r) expected
   in
 
-  let last_expected, expected =
-    ([], [ Eio.Path.(native_exn @@ (tmpdir / "foo")) ])
-  in
+  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "foo")) true;
   write ~sw ~fs "foo" ("foo" ^ string_of_int i);
-  wait_and_check_events "update foo" expected last_expected;
+  wait_and_check_events "update foo";
 
-  let last_expected, expected =
-    (expected, [ Eio.Path.(native_exn @@ (tmpdir / "foo")) ])
-  in
+  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "foo")) true;
   remove ~fs "foo";
-  wait_and_check_events "remove foo" expected last_expected;
+  wait_and_check_events "remove foo";
 
-  let last_expected, expected =
-    (expected, [ Eio.Path.(native_exn @@ (tmpdir / "foo")) ])
-  in
+  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "foo")) true;
   write ~sw ~fs "foo" ("foo" ^ string_of_int i);
-  wait_and_check_events "create foo" expected last_expected;
+  wait_and_check_events "create foo";
 
-  let last_expected, expected =
-    (expected, [ Eio.Path.(native_exn @@ (tmpdir / "bar")) ])
-  in
+  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "bar")) true;
   write ~sw ~fs "bar" ("bar" ^ string_of_int i);
-  wait_and_check_events "create bar" expected last_expected;
+  wait_and_check_events "create bar";
 
-  let last_expected, expected =
-    ( expected,
-      [
-        Eio.Path.(native_exn @@ (tmpdir / "bar"));
-        Eio.Path.(native_exn @@ (tmpdir / "barx"));
-      ] )
-  in
+  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "bar")) true;
+  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "barx")) true;
   move ~fs "bar" "barx";
-  wait_and_check_events ~n:2 "move bar" expected last_expected;
+  wait_and_check_events ~n:2 "move bar";
   unwatch ()
 
 let random_letter () = Char.(chr @@ (code 'a' + Random.int 26))
@@ -114,23 +117,23 @@ let prepare_fs ~sw ~fs:eio_fs n =
   let fs = Array.init n (fun i -> (random_path 4, string_of_int i)) in
   Array.iter (fun (k, v) -> write ~sw ~fs:eio_fs k v) fs
 
-let random_polls ~sw ~fs n () =
+let random_polls ~sw ~fs ~clock n () =
   mkdir (tmpdir fs);
   let rec aux = function
     | 0 -> ()
     | i ->
-        poll ~fs ~mkdir:false i ();
+        poll ~fs ~clock ~mkdir:false i ();
         aux (i - 1)
   in
   prepare_fs ~sw ~fs n;
   match Irmin_watcher.mode with `Polling -> aux 10 | _ -> aux 100
 
-let polling_tests ~sw ~fs =
+let polling_tests ~sw ~fs ~clock =
   [
-    ("enoent", `Quick, run ~fs (poll ~fs ~mkdir:false 0));
-    ("basic", `Quick, run ~fs (poll ~fs ~mkdir:true 0));
-    ("100s", `Quick, run ~fs (random_polls ~sw ~fs 100));
-    ("1000s", `Slow, run ~fs (random_polls ~sw ~fs 1000));
+    ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
+    ("basic", `Quick, run ~fs (poll ~fs ~clock ~mkdir:true 0));
+    ("100s", `Quick, run ~fs (random_polls ~sw ~fs ~clock 100));
+    ("1000s", `Slow, run ~fs (random_polls ~sw ~fs ~clock 1000));
   ]
 
 let mode =
@@ -139,7 +142,7 @@ let mode =
   | `Inotify -> "inotify"
   | `Polling -> "polling"
 
-let tests ~sw ~fs = [ (mode, polling_tests ~sw ~fs) ]
+let tests ~sw ~fs ~clock = [ (mode, polling_tests ~sw ~fs ~clock) ]
 
 let reporter () =
   let pad n x =
@@ -172,4 +175,4 @@ let () =
   Logs.set_level (Some Logs.Debug);
   Logs.set_reporter (reporter ());
   Irmin_watcher.set_polling_time 0.1;
-  Alcotest.run "irmin-watch" (tests ~sw ~fs:env#fs)
+  Alcotest.run "irmin-watch" (tests ~sw ~fs:env#fs ~clock:env#clock)
