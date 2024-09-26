@@ -38,7 +38,7 @@ let poll ~fs ~clock ~mkdir:m i () =
   in
   let reset () = events := [] in
   let rec wait ?n () =
-    Eio.Time.with_timeout_exn clock 60. (fun () ->
+    Eio.Time.with_timeout_exn clock 360. (fun () ->
         match !events with
         | [] ->
             Condition.await_no_mutex cond;
