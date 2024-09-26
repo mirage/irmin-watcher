@@ -77,7 +77,11 @@ let poll ~fs ~clock ~mkdir:m i () =
       if n > 0 then loop n
     in
     loop n;
-    Hashtbl.iter (fun _ r -> Alcotest.check Alcotest.bool s false r) expected
+    Hashtbl.iter
+      (fun k r ->
+        Fmt.pr "%s %b@." k r;
+        Alcotest.check Alcotest.bool s false r)
+      expected
   in
 
   Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "foo")) true;
