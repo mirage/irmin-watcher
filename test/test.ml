@@ -66,10 +66,9 @@ let poll ~fs ~clock ~mkdir:m i () =
           (fun n event ->
             match Hashtbl.find_opt expected event with
             | Some true ->
-                Fmt.pr "BOOP@.";
                 Hashtbl.replace expected event false;
-                n
-            | Some false -> n + 1
+                n - 1
+            | Some false -> n
             | None ->
                 Alcotest.check Alcotest.reject s () ();
                 assert false)
