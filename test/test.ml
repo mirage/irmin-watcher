@@ -70,6 +70,7 @@ let poll ~fs ~clock ~mkdir:m i () =
                 n - 1
             | Some false -> n
             | None ->
+                Fmt.pr "event: %s@." event;
                 Alcotest.check Alcotest.reject s () ();
                 assert false)
           n events
