@@ -72,7 +72,7 @@ let poll ~fs ~clock ~mkdir:m i () =
             | None ->
                 Alcotest.check Alcotest.reject s () ();
                 assert false)
-          0 events
+          n events
       in
       if n > 0 then loop n
     in
