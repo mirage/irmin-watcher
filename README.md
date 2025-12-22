@@ -15,7 +15,7 @@ irmin-watcher can be installed with `opam`:
 
     opam install irmin-watcher
 
-If you don't use `opam` consult the [`opam`](opam) file for build
+If you don't use `opam` consult the [`opam`](irmin-watcher.opam) file for build
 instructions.
 
 ## Documentation
