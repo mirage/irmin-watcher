@@ -4,33 +4,20 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
+open Eio
 open Astring
-open Lwt.Infix
 
 let src = Logs.Src.create "irmin-watcher" ~doc:"Irmin watcher logging"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
 (* run [t] and returns an handler to stop the task. *)
-let stoppable t =
-  let s, u = Lwt.task () in
-  Lwt.async (fun () -> Lwt.pick [ s; t () ]);
-  function
-  | () ->
-      Lwt.wakeup u ();
-      Lwt.return_unit
-
-external unix_realpath : string -> string = "irmin_watcher_unix_realpath"
-
-let realpath dir =
-  let ( / ) x y = match y with None -> x | Some y -> Filename.concat x y in
-  let rec aux dir file =
-    try unix_realpath dir / file
-    with Unix.Unix_error (Unix.ENOENT, _, _) ->
-      let file = Filename.basename dir / file in
-      aux (Filename.dirname dir) (Some file)
-  in
-  aux dir None
+let stoppable ~sw t =
+  let p, r = Promise.create () in
+  Fiber.fork_daemon ~sw (fun () ->
+      Fiber.first (fun () -> Promise.await p) t;
+      `Stop_daemon);
+  Promise.resolve r
 
 module Digests = struct
   include Set.Make (struct
@@ -40,13 +27,9 @@ module Digests = struct
   end)
 
   let of_list l = List.fold_left (fun set elt -> add elt set) empty l
-
   let sdiff x y = union (diff x y) (diff y x)
-
   let digest_pp ppf d = Fmt.string ppf @@ Digest.to_hex d
-
   let pp_elt = Fmt.(Dump.pair string digest_pp)
-
   let pp ppf t = Fmt.(Dump.list pp_elt) ppf @@ elements t
 
   let files t =
@@ -54,116 +37,119 @@ module Digests = struct
 end
 
 module Dispatch = struct
-  type t = (string, (int * (string -> unit Lwt.t)) list) Hashtbl.t
+  type t = (string, (int * (Eio.Fs.dir_ty Eio.Path.t -> unit)) list) Hashtbl.t
 
   let empty () : t = Hashtbl.create 10
-
   let clear t = Hashtbl.clear t
 
-  let stats t ~dir = try List.length (Hashtbl.find t dir) with Not_found -> 0
+  let stats t ~dir =
+    let nat_dir = Eio.Path.native_exn dir in
+    try List.length (Hashtbl.find t nat_dir) with Not_found -> 0
 
   (* call all the callbacks on the file *)
   let apply t ~dir ~file =
-    let fns = try Hashtbl.find t dir with Not_found -> [] in
-    Lwt_list.iter_p
+    let nat_dir = Eio.Path.native_exn dir in
+    let fns = try Hashtbl.find t nat_dir with Not_found -> [] in
+    Fiber.List.iter
       (fun (id, f) ->
         Log.debug (fun f -> f "callback %d" id);
         f file)
       fns
 
   let add t ~id ~dir fn =
-    let fns = try Hashtbl.find t dir with Not_found -> [] in
+    let nat_dir = Eio.Path.native_exn dir in
+    let fns = try Hashtbl.find t nat_dir with Not_found -> [] in
     let fns = (id, fn) :: fns in
-    Hashtbl.replace t dir fns
+    Hashtbl.replace t nat_dir fns
 
   let remove t ~id ~dir =
-    let fns = try Hashtbl.find t dir with Not_found -> [] in
+    let nat_dir = Eio.Path.native_exn dir in
+    let fns = try Hashtbl.find t nat_dir with Not_found -> [] in
     let fns = List.filter (fun (x, _) -> x <> id) fns in
-    if fns = [] then Hashtbl.remove t dir else Hashtbl.replace t dir fns
+    if fns = [] then Hashtbl.remove t nat_dir else Hashtbl.replace t nat_dir fns
 
   let length t = Hashtbl.fold (fun _ v acc -> acc + List.length v) t 0
 end
 
 module Watchdog = struct
-  type t = { t : (string, unit -> unit Lwt.t) Hashtbl.t; d : Dispatch.t }
+  type t = { t : (string, unit -> unit) Hashtbl.t; d : Dispatch.t }
 
   let length t = Hashtbl.length t.t
-
   let dispatch t = t.d
 
-  type hook = (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
+  type hook = (Eio.Fs.dir_ty Eio.Path.t -> unit) -> unit -> unit
 
   let empty () : t = { t = Hashtbl.create 10; d = Dispatch.empty () }
 
   let clear { t; d } =
-    Hashtbl.fold (fun _dir stop acc -> acc >>= stop) t Lwt.return_unit
-    >|= fun () ->
+    Hashtbl.iter (fun _dir stop -> stop ()) t;
     Hashtbl.clear t;
     Dispatch.clear d
 
-  let watchdog t dir = try Some (Hashtbl.find t dir) with Not_found -> None
+  let watchdog t dir =
+    let nat_dir = Eio.Path.native_exn dir in
+    try Some (Hashtbl.find t nat_dir) with Not_found -> None
 
   let start { t; d } ~dir listen =
     match watchdog t dir with
-    | Some _ ->
-        assert (Dispatch.stats d ~dir <> 0);
-        Lwt.return_unit
+    | Some _ -> assert (Dispatch.stats d ~dir <> 0)
     | None -> (
         (* Note: multiple threads can wait here *)
-        listen (fun file -> Dispatch.apply d ~dir ~file)
-        >>= fun u ->
+        let u = listen (fun file -> Dispatch.apply d ~dir ~file) in
         match watchdog t dir with
         | Some _ ->
             (* Note: someone else won the race, cancel our own thread
                to avoid avoid having too many wathdogs for [dir]. *)
             u ()
         | None ->
-            Log.debug (fun f -> f "Start watchdog for %s" dir);
-            Hashtbl.add t dir u;
-            Lwt.return_unit)
+            Log.debug (fun f -> f "Start watchdog for %a" Eio.Path.pp dir);
+            let nat_dir = Eio.Path.native_exn dir in
+            Hashtbl.add t nat_dir u)
 
   let stop { t; d } ~dir =
     match watchdog t dir with
-    | None ->
-        assert (Dispatch.stats d ~dir = 0);
-        Lwt.return_unit
+    | None -> assert (Dispatch.stats d ~dir = 0)
     | Some stop ->
-        if Dispatch.stats d ~dir <> 0 then (
-          Log.debug (fun f -> f "Active allback are registered for %s" dir);
-          Lwt.return_unit)
+        if Dispatch.stats d ~dir <> 0 then
+          Log.debug (fun f ->
+              f "Active callbacks are registered for %a" Eio.Path.pp dir)
         else (
-          Log.debug (fun f -> f "Stop watchdog for %s" dir);
-          Hashtbl.remove t dir;
+          Log.debug (fun f -> f "Stop watchdog for %a" Eio.Path.pp dir);
+          let nat_dir = Eio.Path.native_exn dir in
+          Hashtbl.remove t nat_dir;
           stop ())
 end
 
 type hook =
-  int -> string -> (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
+  int ->
+  Eio.Fs.dir_ty Eio.Path.t ->
+  (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
+  unit ->
+  unit
 
 type t = {
-  mutable listen : int -> string -> (string -> unit Lwt.t) -> unit Lwt.t;
-  mutable stop : unit -> unit Lwt.t;
+  mutable listen :
+    int ->
+    Eio.Fs.dir_ty Eio.Path.t ->
+    (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
+    unit;
+  mutable stop : unit -> unit;
   watchdog : Watchdog.t;
 }
 
 let watchdog t = t.watchdog
 
-let hook t id dir f = t.listen id dir f >|= fun () -> t.stop
+let hook t id dir f =
+  t.listen id dir f;
+  t.stop
 
 let create listen =
   let watchdog = Watchdog.empty () in
-  let t =
-    {
-      listen = (fun _ _ _ -> Lwt.return_unit);
-      stop = (fun _ -> Lwt.return_unit);
-      watchdog;
-    }
-  in
+  let t = { listen = (fun _ _ _ -> ()); stop = (fun _ -> ()); watchdog } in
   let listen id dir fn =
-    let dir = realpath dir in
     let d = Watchdog.dispatch watchdog in
     Dispatch.add d ~id ~dir fn;
-    Watchdog.start watchdog ~dir (listen dir) >|= fun () ->
+    Watchdog.start watchdog ~dir (listen dir);
     let stop () =
       Dispatch.remove d ~id ~dir;
       Watchdog.stop watchdog ~dir
