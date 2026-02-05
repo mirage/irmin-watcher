@@ -11,9 +11,12 @@ jobs:
       matrix:
         os:
           - macos-latest
+          - ubuntu-latest
         ocaml-version:
-          - 5.1.1
-          - 5.1.0
+          - "5.4"
+          - "5.3"
+          - "5.2"
+          - "5.1"
 
     runs-on: ${{ matrix.os }}
 
