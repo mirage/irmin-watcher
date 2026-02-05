@@ -22,14 +22,14 @@ depends: [
   "mtime" {with-test & >= "2.0.0"}
   "inotify" {>= "2.6" & os = "linux"}
   "inotify-eio" {>= "2.6" & os = "linux"}
-  "cf-lwt" {>= "0.4"}
+  "cf-lwt" {>= "0.4" & os = "macos"}
   "lwt"
   "eio" {>= "1.0"}
   "eio_main" {with-test & >= "1.0"}
   "logs"
   "fmt"
   "astring"
-  "fsevents-lwt"
+  "fsevents-lwt" {os = "macos"}
   "lwt_eio" {with-test | os = "macos"}
   "odoc" {with-doc}
 ]
