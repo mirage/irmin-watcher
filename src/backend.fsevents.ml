@@ -61,9 +61,9 @@ let v ~sw =
     let rec wait_for_changes () =
       match List.rev !events with
       | [] -> Lwt_condition.wait cond >>= wait_for_changes
-      | h :: t ->
+      | _h :: t ->
           events := List.rev t;
-          Lwt.return (`File h)
+          Lwt.return `Unknown
     in
     let wait_for_changes () = Lwt_eio.run_lwt wait_for_changes in
     let unlisten =

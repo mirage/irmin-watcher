@@ -37,7 +37,9 @@
     (>= "2.6")
     (= :os "linux")))
   (cf-lwt
-   (>= "0.4"))
+   (and
+    (>= "0.4")
+    (= :os "macos")))
   lwt
   (eio
    (>= "1.0"))
@@ -48,7 +50,8 @@
   logs
   fmt
   astring
-  fsevents-lwt
+  (fsevents-lwt
+   (= :os "macos"))
   (lwt_eio
    (or
     :with-test
