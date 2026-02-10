@@ -1,6 +1,13 @@
 (executable
  (name test)
- (libraries alcotest logs.fmt irmin-watcher mtime mtime.clock.os))
+ (libraries
+  alcotest
+  logs.fmt
+  eio_main
+  lwt_eio
+  irmin-watcher
+  mtime
+  mtime.clock.os))
 
 (rule
  (alias runtest)

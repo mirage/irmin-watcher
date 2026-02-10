@@ -8,21 +8,25 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
-val v : Core.t
-(** [v id p f] is the listen hook calling [f] everytime a sub-path of [p] is
-    modified. Return a function to call to remove the hook. Default to polling
-    if no better solution is available. FSevents and Inotify backends are
-    available. *)
-
 val mode : [ `FSEvents | `Inotify | `Polling ]
 
 type stats = { watchdogs : int; dispatches : int }
 
-val hook : Core.hook
-(** [hook t] is an {!Irmin.Watcher} compatible representation of {!v}. *)
+val hook :
+  sw:Eio.Switch.t ->
+  int ->
+  Eio.Fs.dir_ty Eio.Path.t ->
+  (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
+  unit ->
+  unit
+(** [hook ~sw id p f] is the listen hook calling [f] everytime a sub-path of [p]
+    is modified. [id] should be a unique identifier used to distinguish between
+    different hooks registered on the same path. Return a function to call to
+    remove the hook. Default to polling if no better solution is available.
+    FSevents and Inotify backends are available. *)
 
-val stats : unit -> stats
-(** [stats ()] is a snapshot of [v]'s stats. *)
+val stats : sw:Eio.Switch.t -> unit -> stats
+(** [stats ~sw ()] is a stats snapshot. *)
 
 val set_polling_time : float -> unit
 (** [set_polling_time f] set the polling interval to [f]. Only valid when
