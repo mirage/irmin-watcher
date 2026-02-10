@@ -21,8 +21,8 @@ val hook :
   unit
 (** [hook ~sw id p f] is the listen hook calling [f] everytime a sub-path of [p]
     is modified. [id] should be a unique identifier used to distinguish between
-    different hooks registered on the same path. Return a function to call
-    to remove the hook. Default to polling if no better solution is available.
+    different hooks registered on the same path. Return a function to call to
+    remove the hook. Default to polling if no better solution is available.
     FSevents and Inotify backends are available. *)
 
 val stats : sw:Eio.Switch.t -> unit -> stats
