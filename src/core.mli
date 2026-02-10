@@ -86,7 +86,8 @@ module Watchdog : sig
       a new watchdog if needed otherwise re-using the previous one. *)
 
   val stop : t -> dir:Eio.Fs.dir_ty Eio.Path.t -> unit
-  (** [stop t ~dir] stops the filesystem watchdog on directory [dir] (if any). *)
+  (** [stop t ~dir] stops the filesystem watchdog on directory [dir] (if any).
+  *)
 
   val length : t -> int
   (** [length t] is the number of watchdog threads. *)
