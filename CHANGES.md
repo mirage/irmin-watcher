@@ -1,6 +1,9 @@
-### Pending
+### 0.5.1 (2026-04-24)
 
-- Use _WIN32 and MAX_PATH on Windows to support MSVC (#34, @jonahbeckford)
+- Use `_WIN32` and `MAX_PATH` on Windows to support MSVC (#34, @jonahbeckford)
+- Fix build on Alpine 3.19 for OCaml 5.1 (#35, @shakthimaan)
+- Update GitHub Actions workflow for macOS (#36, @art-w)
+- Documentation: update links (#33, @gs0510) and fix `opam` link in README (#45, @ElectreAAS)
 
 ### 0.5.0 (2020-04-30)
 
