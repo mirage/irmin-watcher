@@ -23,7 +23,7 @@ depends: [
   "inotify" {>= "2.6" & os = "linux"}
   "inotify-eio" {>= "2.6" & os = "linux"}
   "cf-lwt" {>= "0.4" & os = "macos"}
-  "lwt"
+  "lwt" {os = "macos"}
   "eio" {>= "1.0"}
   "eio_main" {with-test & >= "1.0"}
   "logs"

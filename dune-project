@@ -40,7 +40,8 @@
    (and
     (>= "0.4")
     (= :os "macos")))
-  lwt
+  (lwt
+   (= :os "macos"))
   (eio
    (>= "1.0"))
   (eio_main
