@@ -127,37 +127,22 @@ type hook =
   unit ->
   unit
 
-type t = {
-  mutable listen :
-    int ->
-    Eio.Fs.dir_ty Eio.Path.t ->
-    (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
-    unit;
-  mutable stop : unit -> unit;
-  watchdog : Watchdog.t;
-}
+type t = { listen : hook; watchdog : Watchdog.t }
 
 let watchdog t = t.watchdog
-
-let hook t id dir f =
-  t.listen id dir f;
-  t.stop
+let hook t = t.listen
 
 let create listen =
   let watchdog = Watchdog.empty () in
-  let t = { listen = (fun _ _ _ -> ()); stop = (fun _ -> ()); watchdog } in
   let listen id dir fn =
     let d = Watchdog.dispatch watchdog in
     Dispatch.add d ~id ~dir fn;
     Watchdog.start watchdog ~dir (listen dir);
-    let stop () =
+    fun () ->
       Dispatch.remove d ~id ~dir;
       Watchdog.stop watchdog ~dir
-    in
-    t.stop <- stop
   in
-  t.listen <- listen;
-  t
+  { listen; watchdog }
 
 let default_polling_time = ref 1.
 
