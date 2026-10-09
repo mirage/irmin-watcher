@@ -4,16 +4,16 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-let v = Lazy.force Backend.v
+type t = Core.t
 
+let v ~sw = Backend.v ~sw
 let mode = (Backend.mode :> [ `FSEvents | `Inotify | `Polling ])
-
-let hook = Core.hook v
+let hook = Core.hook
 
 type stats = { watchdogs : int; dispatches : int }
 
-let stats () =
-  let w = Core.watchdog v in
+let stats t =
+  let w = Core.watchdog t in
   let d = Core.Watchdog.dispatch w in
   { watchdogs = Core.Watchdog.length w; dispatches = Core.Dispatch.length d }
 

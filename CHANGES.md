@@ -1,3 +1,14 @@
+### 0.6.0 (unreleased)
+
+- Move from Lwt to Eio (#37, #46, @patricoferris, @clecat, @zshipko, @balat).
+  This changes the API:
+  - Paths are `Eio.Fs.dir_ty Eio.Path.t` values instead of strings.
+  - `Irmin_watcher.v ~sw` creates a watcher. `hook` and `stats` take it as
+    their first argument. The global watcher `Irmin_watcher.v` is gone.
+  - The FSevents backend (macOS) needs a running `Lwt_eio` event loop.
+- Require OCaml 5.1 or later.
+- Depend on `lwt` only on macOS.
+
 ### 0.5.1 (2026-04-24)
 
 - Use `_WIN32` and `MAX_PATH` on Windows to support MSVC (#34, @jonahbeckford)

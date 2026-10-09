@@ -8,21 +8,40 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
-val v : Core.t
-(** [v id p f] is the listen hook calling [f] everytime a sub-path of [p] is
-    modified. Return a function to call to remove the hook. Default to polling
-    if no better solution is available. FSevents and Inotify backends are
-    available. *)
-
 val mode : [ `FSEvents | `Inotify | `Polling ]
+(** [mode] is the backend used by the watchers: FSevents on macOS, Inotify on
+    Linux and polling elsewhere. *)
+
+type t
+(** The type for watchers. A watcher runs at most one watchdog per directory,
+    shared by all the hooks registered on that directory. *)
+
+val v : sw:Eio.Switch.t -> t
+(** [v ~sw] is a new watcher using the {!mode} backend. The fibers watching
+    directories are attached to [sw]. A program usually creates a single watcher
+    and registers all its hooks on it.
+
+    With the FSevents backend, the watcher runs Lwt code through [Lwt_eio]: an
+    [Lwt_eio] event loop must be running (see [Lwt_eio.with_event_loop]). *)
+
+val hook :
+  t ->
+  int ->
+  Eio.Fs.dir_ty Eio.Path.t ->
+  (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
+  unit ->
+  unit
+(** [hook t id p f] is the listen hook calling [f] everytime a sub-path of [p]
+    is modified. [id] should be a unique identifier used to distinguish between
+    different hooks registered on the same path. Return a function to call to
+    remove the hook. *)
 
 type stats = { watchdogs : int; dispatches : int }
+(** The type for watcher statistics: the number of active watchdogs, and the
+    number of registered hooks. *)
 
-val hook : Core.hook
-(** [hook t] is an {!Irmin.Watcher} compatible representation of {!v}. *)
-
-val stats : unit -> stats
-(** [stats ()] is a snapshot of [v]'s stats. *)
+val stats : t -> stats
+(** [stats t] is a snapshot of [t]'s statistics. *)
 
 val set_polling_time : float -> unit
 (** [set_polling_time f] set the polling interval to [f]. Only valid when
