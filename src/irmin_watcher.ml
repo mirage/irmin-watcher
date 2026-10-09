@@ -4,14 +4,16 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
+type t = Core.t
+
 let v ~sw = Backend.v ~sw
 let mode = (Backend.mode :> [ `FSEvents | `Inotify | `Polling ])
-let hook ~sw = Core.hook (v ~sw)
+let hook = Core.hook
 
 type stats = { watchdogs : int; dispatches : int }
 
-let stats ~sw () =
-  let w = Core.watchdog (v ~sw) in
+let stats t =
+  let w = Core.watchdog t in
   let d = Core.Watchdog.dispatch w in
   { watchdogs = Core.Watchdog.length w; dispatches = Core.Dispatch.length d }
 

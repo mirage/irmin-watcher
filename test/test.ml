@@ -31,8 +31,9 @@ let poll ~fs ~clock ~mkdir:m i () =
   if m then mkdir tmpdir;
   let events = ref [] in
   let cond = Condition.create () in
+  let watcher = Irmin_watcher.v ~sw in
   let unwatch =
-    Irmin_watcher.hook ~sw 0 tmpdir (fun e ->
+    Irmin_watcher.hook watcher 0 tmpdir (fun e ->
         events := e :: !events;
         Condition.broadcast cond)
   in
@@ -132,8 +133,30 @@ let random_polls ~sw ~fs ~clock n () =
   prepare_fs ~sw ~fs n;
   match Irmin_watcher.mode with `Polling -> aux 10 | _ -> aux 100
 
+let stats ~fs () =
+  Eio.Switch.run @@ fun sw ->
+  let tmpdir = tmpdir fs in
+  mkdir tmpdir;
+  let watcher = Irmin_watcher.v ~sw in
+  let check msg (watchdogs, dispatches) =
+    let stats = Irmin_watcher.stats watcher in
+    Alcotest.(check (pair int int))
+      msg (watchdogs, dispatches)
+      (stats.watchdogs, stats.dispatches)
+  in
+  check "no hook" (0, 0);
+  let unwatch_0 = Irmin_watcher.hook watcher 0 tmpdir ignore in
+  check "one hook" (1, 1);
+  let unwatch_1 = Irmin_watcher.hook watcher 1 tmpdir ignore in
+  check "two hooks on the same directory" (1, 2);
+  unwatch_0 ();
+  check "one hook removed" (1, 1);
+  unwatch_1 ();
+  check "all hooks removed" (0, 0)
+
 let polling_tests ~sw ~fs ~clock =
   [
+    ("stats", `Quick, run ~fs (stats ~fs));
     ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
     ("basic", `Quick, run ~fs (poll ~fs ~clock ~mkdir:true 0));
     ("100s", `Quick, run ~fs (random_polls ~sw ~fs ~clock 100));
