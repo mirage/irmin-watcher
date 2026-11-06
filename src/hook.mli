@@ -4,7 +4,7 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(** Active polling backend for Irmin watchers.
+(** Directory scanning shared by the Irmin watcher backends.
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
