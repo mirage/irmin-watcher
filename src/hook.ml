@@ -82,12 +82,12 @@ let rec poll n ~callback ~wait_for_changes dir files (event : event) =
 
 let id = ref 0
 
-let v ~sw ~wait_for_changes ~dir callback =
+let run ~ready ~wait_for_changes ~dir callback =
   let n = !id in
   incr id;
   let files = read_files dir in
-  Core.stoppable ~sw (fun () ->
-      poll n ~callback ~wait_for_changes dir files `Unknown)
+  ready ();
+  poll n ~callback ~wait_for_changes dir files `Unknown
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

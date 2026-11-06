@@ -154,9 +154,33 @@ let stats ~fs () =
   unwatch_1 ();
   check "all hooks removed" (0, 0)
 
+(* The watcher keeps working once the last hook on a directory is removed,
+   including when two hooks on it start concurrently. *)
+let unwatch ~fs ~clock () =
+  Eio.Switch.run @@ fun sw ->
+  let tmpdir = tmpdir fs in
+  mkdir tmpdir;
+  let watcher = Irmin_watcher.v ~sw in
+  let unwatch = Irmin_watcher.hook watcher 0 tmpdir ignore in
+  unwatch ();
+  Eio.Time.sleep clock 0.2;
+  let unwatch_0, unwatch_1 =
+    Fiber.pair
+      (fun () -> Irmin_watcher.hook watcher 0 tmpdir ignore)
+      (fun () -> Irmin_watcher.hook watcher 1 tmpdir ignore)
+  in
+  unwatch_0 ();
+  unwatch_1 ();
+  Eio.Time.sleep clock 0.2;
+  let stats = Irmin_watcher.stats watcher in
+  Alcotest.(check (pair int int))
+    "no watchdog left" (0, 0)
+    (stats.watchdogs, stats.dispatches)
+
 let polling_tests ~sw ~fs ~clock =
   [
     ("stats", `Quick, run ~fs (stats ~fs));
+    ("unwatch", `Quick, run ~fs (unwatch ~fs ~clock));
     ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
     ("basic", `Quick, run ~fs (poll ~fs ~clock ~mkdir:true 0));
     ("100s", `Quick, run ~fs (random_polls ~sw ~fs ~clock 100));

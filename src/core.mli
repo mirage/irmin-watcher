@@ -104,8 +104,12 @@ type hook =
 type t
 (** The type for listeners. *)
 
-val create : (Eio.Fs.dir_ty Eio.Path.t -> Watchdog.hook) -> t
-(** [create h] is the Irmin watcher using the update hook [h]. *)
+val create : sw:Eio.Switch.t -> (Eio.Fs.dir_ty Eio.Path.t -> Watchdog.hook) -> t
+(** [create ~sw h] is the Irmin watcher using the update hook [h], whose
+    watchdogs run in fibers attached to [sw]. Once [sw] is cancelled, its hook
+    raises [Invalid_argument], or [Cancelled] if its caller is cancelled too,
+    and its watchdogs are forgotten once [sw] is finished. [create] raises
+    [Invalid_argument] if [sw] is finished. *)
 
 val watchdog : t -> Watchdog.t
 (** [watchdog t] is [t]'s watchdog. *)
@@ -115,10 +119,18 @@ val hook : t -> hook
 
 (** {1 Helpers} *)
 
-val stoppable : sw:Eio.Switch.t -> (unit -> unit) -> unit -> unit
-(** [stoppable ~sw t] is a function [f] such that calling [f] will cancel the
-    thread [t]. The switch passed to the function is attached to the forked
-    fiber for [t]. *)
+val spawn :
+  sw:Eio.Switch.t ->
+  (sw:Eio.Switch.t -> ready:(unit -> unit) -> unit) ->
+  unit ->
+  unit
+(** [spawn ~sw f] runs [f ~sw:sw' ~ready] in a new fiber attached to [sw]. [f]
+    attaches its resources to the switch [sw'], and calls [ready ()] once it is
+    set up. [spawn ~sw f] returns once [f] has called [ready ()], or raises the
+    exception [f] raised before that. It returns a function that cancels [f];
+    [sw'] then releases [f]'s resources once all of [f]'s fibers are finished.
+    [spawn] raises [Invalid_argument] if [sw] is cancelled. If the caller is
+    cancelled before [f] is ready, [f] is cancelled too. *)
 
 val default_polling_time : float ref
 

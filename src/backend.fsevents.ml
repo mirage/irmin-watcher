@@ -35,7 +35,7 @@ let start_runloop dir =
   in
   (stream, stop_scheduler)
 
-let listen ~sw dir stream fn =
+let listen dir stream fn =
   let path_of_event { Fsevents_lwt.path; _ } = path in
   let iter () =
     Lwt_stream.iter_s
@@ -45,7 +45,7 @@ let listen ~sw dir stream fn =
         fn @@ path)
       stream
   in
-  Core.stoppable ~sw (fun () -> Lwt_eio.run_lwt iter)
+  Lwt_eio.run_lwt iter
 
 (* Note: we use FSevents to detect any change, and we re-read the full
    tree on every change (so very similar to active polling, but
@@ -55,29 +55,28 @@ let listen ~sw dir stream fn =
 let v ~sw =
   let listen dir f =
     Log.info (fun l -> l "FSevents mode");
-    let events = ref [] in
-    let cond = Lwt_condition.create () in
-    let stream, stop_runloop = start_runloop dir in
-    let rec wait_for_changes () =
-      match List.rev !events with
-      | [] -> Lwt_condition.wait cond >>= wait_for_changes
-      | _h :: t ->
-          events := List.rev t;
-          Lwt.return `Unknown
-    in
-    let wait_for_changes () = Lwt_eio.run_lwt wait_for_changes in
-    let unlisten =
-      listen ~sw dir stream (fun path ->
-          events := path :: !events;
-          Lwt_condition.signal cond ();
-          Lwt.return_unit)
-    in
-    Hook.v ~sw ~wait_for_changes ~dir f |> fun unpoll () ->
-    stop_runloop ();
-    unlisten ();
-    unpoll ()
+    Core.spawn ~sw (fun ~sw ~ready ->
+        let events = ref [] in
+        let cond = Lwt_condition.create () in
+        let stream, stop_runloop = start_runloop dir in
+        Eio.Switch.on_release sw stop_runloop;
+        let rec wait_for_changes () =
+          match List.rev !events with
+          | [] -> Lwt_condition.wait cond >>= wait_for_changes
+          | _h :: t ->
+              events := List.rev t;
+              Lwt.return `Unknown
+        in
+        let wait_for_changes () = Lwt_eio.run_lwt wait_for_changes in
+        Eio.Fiber.both
+          (fun () ->
+            listen dir stream (fun path ->
+                events := path :: !events;
+                Lwt_condition.signal cond ();
+                Lwt.return_unit))
+          (fun () -> Hook.run ~ready ~wait_for_changes ~dir f))
   in
-  Core.create listen
+  Core.create ~sw listen
 
 let mode = `FSEvents
 

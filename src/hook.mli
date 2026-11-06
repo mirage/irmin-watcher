@@ -8,20 +8,19 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
-open Core
-
 type event = [ `Unknown | `File of Eio.Fs.dir_ty Eio.Path.t ]
 (** The type for change event. *)
 
-val v :
-  sw:Eio.Switch.t ->
+val run :
+  ready:(unit -> unit) ->
   wait_for_changes:(unit -> event) ->
   dir:Eio.Fs.dir_ty Eio.Path.t ->
-  Watchdog.hook
-(** [v ~sw ~wait_for_changes ~dir] is the watchdog hook using [wait_for_changes]
-    to detect filesystem updates in the directory [dir]. The polling
-    implemention just calls [Eio_unix.sleep]. The switch is used for the forked
-    callback function. *)
+  (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
+  unit
+(** [run ~ready ~wait_for_changes ~dir f] reads the files of the directory
+    [dir], calls [ready ()], then calls [f] on every file that changes. It calls
+    [wait_for_changes] to wait for the next filesystem update, which can be a
+    single file or [`Unknown]. It never returns. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

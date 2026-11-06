@@ -11,13 +11,46 @@ let src = Logs.Src.create "irmin-watcher" ~doc:"Irmin watcher logging"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-(* run [t] and returns an handler to stop the task. *)
-let stoppable ~sw t =
-  let p, r = Promise.create () in
+(* [sw] is cancelled: only raise the cancellation if the caller is cancelled
+   too. *)
+let switch_cancelled () =
+  Fiber.check ();
+  invalid_arg "Irmin_watcher: the switch is cancelled"
+
+let spawn ~sw f =
+  let ready, set_ready = Promise.create () in
+  let stopped, set_stopped = Promise.create () in
+  let stop () = ignore (Promise.try_resolve set_stopped ()) in
+  let run () =
+    Switch.run @@ fun sw ->
+    f ~sw ~ready:(fun () -> ignore (Promise.try_resolve set_ready (Ok ())))
+  in
+  let started = ref false in
   Fiber.fork_daemon ~sw (fun () ->
-      Fiber.first (fun () -> Promise.await p) t;
+      started := true;
+      (try Fiber.first (fun () -> Promise.await stopped) run
+       with e when not (Promise.is_resolved ready) -> (
+         (* Report the failure to [spawn]'s caller. *)
+         let bt = Printexc.get_raw_backtrace () in
+         Promise.resolve set_ready (Error (e, bt));
+         match e with
+         | Cancel.Cancelled _ -> Printexc.raise_with_backtrace e bt
+         | _ when Promise.is_resolved stopped ->
+             (* The caller was cancelled and is not waiting any more. *)
+             Log.err (fun l ->
+                 l "watchdog failed while starting: %a" Fmt.exn_backtrace (e, bt))
+         | _ -> ()));
       `Stop_daemon);
-  Promise.resolve r
+  (* [fork_daemon] runs nothing once [sw] is cancelled. *)
+  if not !started then switch_cancelled ();
+  match Promise.await ready with
+  | Ok () -> stop
+  | Error (Cancel.Cancelled _, _) -> switch_cancelled ()
+  | Error (e, bt) -> Printexc.raise_with_backtrace e bt
+  | exception (Cancel.Cancelled _ as e) ->
+      let bt = Printexc.get_raw_backtrace () in
+      stop ();
+      Printexc.raise_with_backtrace e bt
 
 module Digests = struct
   include Set.Make (struct
@@ -132,9 +165,14 @@ type t = { listen : hook; watchdog : Watchdog.t }
 let watchdog t = t.watchdog
 let hook t = t.listen
 
-let create listen =
+let create ~sw listen =
   let watchdog = Watchdog.empty () in
+  (* No watchdog runs once [sw] is finished. *)
+  Switch.on_release sw (fun () -> Watchdog.clear watchdog);
   let listen id dir fn =
+    (* The watchdog of [dir] may still be registered, but stopped with
+       [sw]. *)
+    if Option.is_some (Switch.get_error sw) then switch_cancelled ();
     let d = Watchdog.dispatch watchdog in
     Dispatch.add d ~id ~dir fn;
     Watchdog.start watchdog ~dir (listen dir);
