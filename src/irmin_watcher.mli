@@ -25,16 +25,12 @@ val v : sw:Eio.Switch.t -> t
     [Lwt_eio] event loop must be running (see [Lwt_eio.with_event_loop]). *)
 
 val hook :
-  t ->
-  int ->
-  Eio.Fs.dir_ty Eio.Path.t ->
-  (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
-  unit ->
-  unit
+  t -> int -> Eio.Fs.dir_ty Eio.Path.t -> (string -> unit) -> unit -> unit
 (** [hook t id p f] is the listen hook calling [f] everytime a sub-path of [p]
-    is modified. [id] should be a unique identifier used to distinguish between
-    different hooks registered on the same path. Return a function to call to
-    remove the hook. *)
+    is modified. [f] receives the path of the modified file relative to [p],
+    using ["/"] as separator. [id] should be a unique identifier used to
+    distinguish between different hooks registered on the same path. Return a
+    function to call to remove the hook. *)
 
 type stats = { watchdogs : int; dispatches : int }
 (** The type for watcher statistics: the number of active watchdogs, and the

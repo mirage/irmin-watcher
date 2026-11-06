@@ -8,19 +8,22 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
-type event = [ `Unknown | `File of Eio.Fs.dir_ty Eio.Path.t ]
-(** The type for change event. *)
+type event = [ `Unknown | `File of string ]
+(** The type for change event. [`File f] is a change of the file [f], given by
+    its path relative to the watched directory. [`Unknown] is a change anywhere
+    in the watched directory. *)
 
 val run :
   ready:(unit -> unit) ->
   wait_for_changes:(unit -> event) ->
   dir:Eio.Fs.dir_ty Eio.Path.t ->
-  (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
+  (string -> unit) ->
   unit
 (** [run ~ready ~wait_for_changes ~dir f] reads the files of the directory
-    [dir], calls [ready ()], then calls [f] on every file that changes. It calls
-    [wait_for_changes] to wait for the next filesystem update, which can be a
-    single file or [`Unknown]. It never returns. *)
+    [dir], calls [ready ()], then calls [f] on every file that changes, with its
+    path relative to [dir]. It calls [wait_for_changes] to wait for the next
+    filesystem update, which can be a single file or [`Unknown]. It never
+    returns. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

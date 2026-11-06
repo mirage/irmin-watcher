@@ -12,26 +12,32 @@ let src = Logs.Src.create "irw-hook" ~doc:"Irmin watcher shared code"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-let list_files kind dir =
-  if Eio.Path.is_directory dir then
-    let d = Eio.Path.read_dir dir in
-    let d = List.map (fun p -> dir / p) d in
-    let d = List.filter kind d in
-    d
+(* Files are named by their path relative to the watched directory, using
+   ["/"] as separator. *)
+let concat rel name = if rel = "" then name else rel ^ "/" ^ name
+let path dir rel = if rel = "" then dir else dir / rel
+
+let list_files kind dir rel =
+  let p = path dir rel in
+  if Eio.Path.is_directory p then
+    Eio.Path.read_dir p
+    |> List.map (concat rel)
+    |> List.filter (fun rel -> kind (dir / rel))
   else []
 
-let directories dir = list_files Eio.Path.is_directory dir
-let files dir = list_files Eio.Path.is_file dir
+let directories = list_files Eio.Path.is_directory
+let files = list_files Eio.Path.is_file
 
 let rec_files dir =
-  let rec aux accu dir =
-    let ds = directories dir in
-    let fs = files dir in
+  let rec aux accu rel =
+    let ds = directories dir rel in
+    let fs = files dir rel in
     List.fold_left aux (fs @ accu) ds
   in
-  aux [] dir
+  aux [] ""
 
-let read_file f =
+let read_file dir rel =
+  let f = dir / rel in
   try
     if not (Eio.Path.is_file f) then None
     else
@@ -42,28 +48,24 @@ let read_file f =
     None
 
 let read_files dir =
-  let new_files = rec_files dir in
   List.fold_left
-    (fun acc path ->
-      match read_file path with
+    (fun acc rel ->
+      match read_file dir rel with
       | None -> acc
-      | Some d ->
-          let nat_dir = Eio.Path.native_exn path in
-          Digests.add (nat_dir, d) acc)
-    Digests.empty new_files
+      | Some d -> Digests.add (rel, d) acc)
+    Digests.empty (rec_files dir)
 
-type event = [ `Unknown | `File of Eio.Fs.dir_ty Eio.Path.t ]
+type event = [ `Unknown | `File of string ]
 
 let rec poll n ~callback ~wait_for_changes dir files (event : event) =
   let new_files =
     match event with
     | `Unknown -> read_files dir
-    | `File path -> (
-        let nat_dir = Eio.Path.native_exn path in
-        let files = Digests.filter (fun (x, _) -> x <> nat_dir) files in
-        match read_file path with
+    | `File rel -> (
+        let files = Digests.filter (fun (x, _) -> x <> rel) files in
+        match read_file dir rel with
         | None -> files
-        | Some d -> Digests.add (nat_dir, d) files)
+        | Some d -> Digests.add (rel, d) files)
   in
   Log.debug (fun l ->
       l "files=%a new_files=%a" Digests.pp files Digests.pp new_files);
@@ -74,7 +76,7 @@ let rec poll n ~callback ~wait_for_changes dir files (event : event) =
       Log.debug (fun f ->
           f "[%d] polling %a: diff:%a" n Eio.Path.pp dir Digests.pp diff);
       let files = Digests.files diff in
-      Fiber.List.iter (fun file -> callback (dir / file)) files)
+      Fiber.List.iter callback files)
   in
   process ();
   let event = wait_for_changes () in

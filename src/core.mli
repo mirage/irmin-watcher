@@ -41,17 +41,12 @@ module Dispatch : sig
   (** [stats t ~dir] is the number of active callbacks registered for the
       directory [dir]. *)
 
-  val apply :
-    t -> dir:Eio.Fs.dir_ty Eio.Path.t -> file:Eio.Fs.dir_ty Eio.Path.t -> unit
+  val apply : t -> dir:Eio.Fs.dir_ty Eio.Path.t -> file:string -> unit
   (** [apply t ~dir ~file] calls [f file] for every callback [f] registered for
       the directory [dir]. *)
 
   val add :
-    t ->
-    id:int ->
-    dir:Eio.Fs.dir_ty Eio.Path.t ->
-    (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
-    unit
+    t -> id:int -> dir:Eio.Fs.dir_ty Eio.Path.t -> (string -> unit) -> unit
   (** [add t ~id ~dir f] adds a new callback [f] to the directory [dir], using
       the unique identifier [id]. *)
 
@@ -72,7 +67,7 @@ module Watchdog : sig
   val dispatch : t -> Dispatch.t
   (** [dispath t] is the table of [t]'s callback dispatch. *)
 
-  type hook = (Eio.Fs.dir_ty Eio.Path.t -> unit) -> unit -> unit
+  type hook = (string -> unit) -> unit -> unit
   (** The type for watchdog hook. *)
 
   val empty : unit -> t
@@ -93,12 +88,7 @@ module Watchdog : sig
   (** [length t] is the number of watchdog threads. *)
 end
 
-type hook =
-  int ->
-  Eio.Fs.dir_ty Eio.Path.t ->
-  (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
-  unit ->
-  unit
+type hook = int -> Eio.Fs.dir_ty Eio.Path.t -> (string -> unit) -> unit -> unit
 (** The type for Irmin.Watch hooks. *)
 
 type t

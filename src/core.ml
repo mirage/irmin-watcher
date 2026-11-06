@@ -70,7 +70,7 @@ module Digests = struct
 end
 
 module Dispatch = struct
-  type t = (string, (int * (Eio.Fs.dir_ty Eio.Path.t -> unit)) list) Hashtbl.t
+  type t = (string, (int * (string -> unit)) list) Hashtbl.t
 
   let empty () : t = Hashtbl.create 10
   let clear t = Hashtbl.clear t
@@ -110,7 +110,7 @@ module Watchdog = struct
   let length t = Hashtbl.length t.t
   let dispatch t = t.d
 
-  type hook = (Eio.Fs.dir_ty Eio.Path.t -> unit) -> unit -> unit
+  type hook = (string -> unit) -> unit -> unit
 
   let empty () : t = { t = Hashtbl.create 10; d = Dispatch.empty () }
 
@@ -153,13 +153,7 @@ module Watchdog = struct
           stop ())
 end
 
-type hook =
-  int ->
-  Eio.Fs.dir_ty Eio.Path.t ->
-  (Eio.Fs.dir_ty Eio.Path.t -> unit) ->
-  unit ->
-  unit
-
+type hook = int -> Eio.Fs.dir_ty Eio.Path.t -> (string -> unit) -> unit -> unit
 type t = { listen : hook; watchdog : Watchdog.t }
 
 let watchdog t = t.watchdog

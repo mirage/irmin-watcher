@@ -26,18 +26,18 @@ let start_watch ~sw dir =
   i
 
 let listen dir i fn =
-  let event_kinds (_, es, _, _) = es in
   let pp_kind = Fmt.of_to_string Inotify.string_of_event_kind in
-  let path_of_event (_, _, _, p) =
-    match p with None -> dir | Some p -> Eio.Path.(dir / p)
-  in
   let rec iter () =
-    let e = Eio_inotify.read i in
-    let path = path_of_event e in
-    let es = event_kinds e in
+    let _, es, _, name = Eio_inotify.read i in
     Log.debug (fun l ->
-        l "inotify: %a %a" Eio.Path.pp path Fmt.(Dump.list pp_kind) es);
-    fn path;
+        l "inotify: %a %a %a" Eio.Path.pp dir
+          Fmt.(option string)
+          name
+          Fmt.(Dump.list pp_kind)
+          es);
+    (* An event without a file name is about [dir] itself, or a queue
+       overflow: rescan the whole directory. *)
+    fn (match name with None -> `Unknown | Some name -> `File name);
     iter ()
   in
   iter ()
@@ -53,7 +53,7 @@ let v ~sw =
     Core.spawn ~sw (fun ~sw ~ready ->
         let i = start_watch ~sw dir in
         let events = Eio.Stream.create max_int in
-        let wait_for_changes () = `File (Eio.Stream.take events) in
+        let wait_for_changes () = Eio.Stream.take events in
         Eio.Fiber.both
           (fun () -> listen dir i (Eio.Stream.add events))
           (fun () -> Hook.run ~ready ~wait_for_changes ~dir f))

@@ -61,7 +61,7 @@ let poll ~fs ~clock ~mkdir:m i () =
   let expected = Hashtbl.create 10 in
   let wait_and_check_events ?(n = 1) s =
     let rec loop n =
-      let events = List.map Eio.Path.native_exn (wait ~n ()) in
+      let events = wait ~n () in
       let n =
         List.fold_left
           (fun n event ->
@@ -86,24 +86,24 @@ let poll ~fs ~clock ~mkdir:m i () =
       expected
   in
 
-  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "foo")) true;
+  Hashtbl.replace expected "foo" true;
   write ~sw ~fs "foo" ("foo" ^ string_of_int i);
   wait_and_check_events "update foo";
 
-  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "foo")) true;
+  Hashtbl.replace expected "foo" true;
   remove ~fs "foo";
   wait_and_check_events "remove foo";
 
-  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "foo")) true;
+  Hashtbl.replace expected "foo" true;
   write ~sw ~fs "foo" ("foo" ^ string_of_int i);
   wait_and_check_events "create foo";
 
-  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "bar")) true;
+  Hashtbl.replace expected "bar" true;
   write ~sw ~fs "bar" ("bar" ^ string_of_int i);
   wait_and_check_events "create bar";
 
-  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "bar")) true;
-  Hashtbl.replace expected Eio.Path.(native_exn @@ (tmpdir / "barx")) true;
+  Hashtbl.replace expected "bar" true;
+  Hashtbl.replace expected "barx" true;
   move ~fs "bar" "barx";
   wait_and_check_events ~n:2 "move bar";
   unwatch ()
@@ -177,10 +177,29 @@ let unwatch ~fs ~clock () =
     "no watchdog left" (0, 0)
     (stats.watchdogs, stats.dispatches)
 
-let polling_tests ~sw ~fs ~clock =
+(* Callbacks receive paths relative to the watched directory, which can itself
+   be relative to the current directory. *)
+let relative ~cwd ~clock () =
+  Eio.Switch.run @@ fun sw ->
+  let dir = Eio.Path.(cwd / "irmin-watcher-relative") in
+  Eio.Path.rmtree ~missing_ok:true dir;
+  mkdir dir;
+  let watcher = Irmin_watcher.v ~sw in
+  let events = Eio.Stream.create max_int in
+  let unwatch = Irmin_watcher.hook watcher 0 dir (Eio.Stream.add events) in
+  Eio.Path.save ~create:(`Or_truncate 0o600) Eio.Path.(dir / "foo") "foo";
+  let event =
+    Eio.Time.with_timeout_exn clock 60. (fun () -> Eio.Stream.take events)
+  in
+  Alcotest.(check string) "path relative to the directory" "foo" event;
+  unwatch ();
+  Eio.Path.rmtree dir
+
+let polling_tests ~sw ~fs ~cwd ~clock =
   [
     ("stats", `Quick, run ~fs (stats ~fs));
     ("unwatch", `Quick, run ~fs (unwatch ~fs ~clock));
+    ("relative", `Quick, relative ~cwd ~clock);
     ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
     ("basic", `Quick, run ~fs (poll ~fs ~clock ~mkdir:true 0));
     ("100s", `Quick, run ~fs (random_polls ~sw ~fs ~clock 100));
@@ -193,7 +212,7 @@ let mode =
   | `Inotify -> "inotify"
   | `Polling -> "polling"
 
-let tests ~sw ~fs ~clock = [ (mode, polling_tests ~sw ~fs ~clock) ]
+let tests ~sw ~fs ~cwd ~clock = [ (mode, polling_tests ~sw ~fs ~cwd ~clock) ]
 
 let reporter () =
   let pad n x =
@@ -226,4 +245,5 @@ let () =
   Logs.set_level (Some Logs.Debug);
   Logs.set_reporter (reporter ());
   Irmin_watcher.set_polling_time 0.1;
-  Alcotest.run "irmin-watch" (tests ~sw ~fs:env#fs ~clock:env#clock)
+  Alcotest.run "irmin-watch"
+    (tests ~sw ~fs:env#fs ~cwd:env#cwd ~clock:env#clock)
