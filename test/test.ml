@@ -197,6 +197,33 @@ let cleanup ~fs () =
   | exception Invalid_argument _ -> ());
   check_stats watcher "failed hook" (0, 0)
 
+(* Hooks on the same directory share a watchdog: they all receive the changes,
+   and removing one of them does not stop the others. *)
+let shared ~fs ~clock () =
+  Eio.Switch.run @@ fun sw ->
+  let tmpdir = tmpdir fs in
+  mkdir tmpdir;
+  let watcher = watcher ~sw in
+  let events_0 = Eio.Stream.create max_int in
+  let events_1 = Eio.Stream.create max_int in
+  let take events =
+    Eio.Time.with_timeout_exn clock 60. (fun () -> Eio.Stream.take events)
+  in
+  let unwatch_0 =
+    Irmin_watcher.hook watcher 0 tmpdir (Eio.Stream.add events_0)
+  in
+  let unwatch_1 =
+    Irmin_watcher.hook watcher 1 tmpdir (Eio.Stream.add events_1)
+  in
+  check_stats watcher "one watchdog" (1, 2);
+  write ~sw ~fs "foo" "foo";
+  Alcotest.(check string) "first hook" "foo" (take events_0);
+  Alcotest.(check string) "second hook" "foo" (take events_1);
+  unwatch_0 ();
+  write ~sw ~fs "bar" "bar";
+  Alcotest.(check string) "remaining hook" "bar" (take events_1);
+  unwatch_1 ()
+
 (* A failing callback stops neither the watcher nor the other callbacks. *)
 let failing_callback ~fs ~clock () =
   Eio.Switch.run @@ fun sw ->
@@ -241,6 +268,7 @@ let polling_tests ~sw ~fs ~cwd ~clock =
     ("stats", `Quick, run ~fs (stats ~fs));
     ("unwatch", `Quick, run ~fs (unwatch ~fs ~clock));
     ("cleanup", `Quick, run ~fs (cleanup ~fs));
+    ("shared", `Quick, run ~fs (shared ~fs ~clock));
     ("failing callback", `Quick, run ~fs (failing_callback ~fs ~clock));
     ("relative", `Quick, relative ~cwd ~clock);
     ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
