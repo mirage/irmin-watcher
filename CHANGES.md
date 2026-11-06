@@ -2,12 +2,32 @@
 
 - Move from Lwt to Eio (#37, #46, @patricoferris, @clecat, @zshipko, @balat).
   This changes the API:
-  - Paths are `Eio.Fs.dir_ty Eio.Path.t` values instead of strings.
-  - `Irmin_watcher.v ~sw` creates a watcher. `hook` and `stats` take it as
-    their first argument. The global watcher `Irmin_watcher.v` is gone.
+  - `hook`, the callbacks and the functions removing hooks are in direct
+    style instead of returning `Lwt.t` values. `hook` must be called from an
+    Eio fiber.
+  - The watched directory is an `Eio.Fs.dir_ty Eio.Path.t` instead of a
+    string. Callbacks still receive the path of the changed file relative to
+    it.
+  - `v` is now a function creating a watcher, `Irmin_watcher.v ~sw ()`, and
+    there is no global watcher. `hook` and `stats` take the watcher as their
+    first argument.
+  - `set_polling_time` is replaced by the `?polling_time` argument of `v`,
+    which raises `Invalid_argument` if it is not positive.
+  - `hook` returns once the directory has been read, and raises the errors
+    met while starting to watch it. It raises `Invalid_argument` once the
+    switch of the watcher is cancelled.
+  - Callbacks always receive paths with `/` as separator, also on Windows.
+  - Exceptions raised by callbacks are logged.
   - The FSevents backend (macOS) needs a running `Lwt_eio` event loop.
+- Removing a hook twice no longer removes another hook with the same id.
+- A callback is no longer called once its hook is removed.
+- A directory removed while it is scanned no longer stops the watcher.
+- Files that cannot be read keep their previous state and are read again
+  later, instead of being reported as removed.
+- With Inotify, rescan the directory when a sub-directory changes or when the
+  event queue overflows.
 - Require OCaml 5.1 or later.
-- Depend on `lwt` only on macOS.
+- Depend on `lwt`, `cf-lwt` and `fsevents-lwt` only on macOS.
 
 ### 0.5.1 (2026-04-24)
 
