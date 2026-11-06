@@ -133,17 +133,18 @@ let random_polls ~sw ~fs ~clock n () =
   prepare_fs ~sw ~fs n;
   match Irmin_watcher.mode with `Polling -> aux 10 | _ -> aux 100
 
+let check_stats watcher msg (watchdogs, dispatches) =
+  let stats = Irmin_watcher.stats watcher in
+  Alcotest.(check (pair int int))
+    msg (watchdogs, dispatches)
+    (stats.watchdogs, stats.dispatches)
+
 let stats ~fs () =
   Eio.Switch.run @@ fun sw ->
   let tmpdir = tmpdir fs in
   mkdir tmpdir;
   let watcher = Irmin_watcher.v ~sw in
-  let check msg (watchdogs, dispatches) =
-    let stats = Irmin_watcher.stats watcher in
-    Alcotest.(check (pair int int))
-      msg (watchdogs, dispatches)
-      (stats.watchdogs, stats.dispatches)
-  in
+  let check = check_stats watcher in
   check "no hook" (0, 0);
   let unwatch_0 = Irmin_watcher.hook watcher 0 tmpdir ignore in
   check "one hook" (1, 1);
@@ -172,10 +173,27 @@ let unwatch ~fs ~clock () =
   unwatch_0 ();
   unwatch_1 ();
   Eio.Time.sleep clock 0.2;
-  let stats = Irmin_watcher.stats watcher in
-  Alcotest.(check (pair int int))
-    "no watchdog left" (0, 0)
-    (stats.watchdogs, stats.dispatches)
+  check_stats watcher "no watchdog left" (0, 0)
+
+(* Removing a hook twice does not remove a later hook with the same id, and a
+   hook that fails to start leaves nothing behind. *)
+let cleanup ~fs () =
+  let tmpdir = tmpdir fs in
+  mkdir tmpdir;
+  Eio.Switch.run (fun sw ->
+      let watcher = Irmin_watcher.v ~sw in
+      let unwatch_0 = Irmin_watcher.hook watcher 0 tmpdir ignore in
+      unwatch_0 ();
+      let unwatch_1 = Irmin_watcher.hook watcher 0 tmpdir ignore in
+      unwatch_0 ();
+      check_stats watcher "hook removed twice" (1, 1);
+      unwatch_1 ());
+  let watcher = Eio.Switch.run (fun sw -> Irmin_watcher.v ~sw) in
+  (match Irmin_watcher.hook watcher 0 tmpdir ignore with
+  | (_ : unit -> unit) ->
+      Alcotest.fail "hook should fail once the switch is finished"
+  | exception Invalid_argument _ -> ());
+  check_stats watcher "failed hook" (0, 0)
 
 (* Callbacks receive paths relative to the watched directory, which can itself
    be relative to the current directory. *)
@@ -199,6 +217,7 @@ let polling_tests ~sw ~fs ~cwd ~clock =
   [
     ("stats", `Quick, run ~fs (stats ~fs));
     ("unwatch", `Quick, run ~fs (unwatch ~fs ~clock));
+    ("cleanup", `Quick, run ~fs (cleanup ~fs));
     ("relative", `Quick, relative ~cwd ~clock);
     ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
     ("basic", `Quick, run ~fs (poll ~fs ~clock ~mkdir:true 0));

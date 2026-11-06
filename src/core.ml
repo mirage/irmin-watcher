@@ -125,7 +125,7 @@ module Watchdog = struct
 
   let start { t; d } ~dir listen =
     match watchdog t dir with
-    | Some _ -> assert (Dispatch.stats d ~dir <> 0)
+    | Some _ -> ()
     | None -> (
         (* Note: multiple threads can wait here *)
         let u = listen (fun file -> Dispatch.apply d ~dir ~file) in
@@ -141,7 +141,7 @@ module Watchdog = struct
 
   let stop { t; d } ~dir =
     match watchdog t dir with
-    | None -> assert (Dispatch.stats d ~dir = 0)
+    | None -> ()
     | Some stop ->
         if Dispatch.stats d ~dir <> 0 then
           Log.debug (fun f ->
@@ -168,11 +168,22 @@ let create ~sw listen =
        [sw]. *)
     if Option.is_some (Switch.get_error sw) then switch_cancelled ();
     let d = Watchdog.dispatch watchdog in
-    Dispatch.add d ~id ~dir fn;
-    Watchdog.start watchdog ~dir (listen dir);
-    fun () ->
-      Dispatch.remove d ~id ~dir;
-      Watchdog.stop watchdog ~dir
+    let active = ref true in
+    (* [fn] is not called once the hook is removed, even for a change found
+       earlier. *)
+    Dispatch.add d ~id ~dir (fun file -> if !active then fn file);
+    let unlisten () =
+      if !active then (
+        active := false;
+        Dispatch.remove d ~id ~dir;
+        Watchdog.stop watchdog ~dir)
+    in
+    (try Watchdog.start watchdog ~dir (listen dir)
+     with e ->
+       let bt = Printexc.get_raw_backtrace () in
+       unlisten ();
+       Printexc.raise_with_backtrace e bt);
+    unlisten
   in
   { listen; watchdog }
 
