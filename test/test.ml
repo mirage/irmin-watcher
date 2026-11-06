@@ -8,6 +8,8 @@ let run ~fs f () =
   clean fs;
   f ()
 
+let watcher ~sw = Irmin_watcher.v ~polling_time:0.1 ~sw ()
+
 let mkdir d =
   let perm = 0o0700 in
   Eio.Path.mkdirs ~exists_ok:true ~perm d
@@ -31,7 +33,7 @@ let poll ~fs ~clock ~mkdir:m i () =
   if m then mkdir tmpdir;
   let events = ref [] in
   let cond = Condition.create () in
-  let watcher = Irmin_watcher.v ~sw in
+  let watcher = watcher ~sw in
   let unwatch =
     Irmin_watcher.hook watcher 0 tmpdir (fun e ->
         events := e :: !events;
@@ -143,7 +145,7 @@ let stats ~fs () =
   Eio.Switch.run @@ fun sw ->
   let tmpdir = tmpdir fs in
   mkdir tmpdir;
-  let watcher = Irmin_watcher.v ~sw in
+  let watcher = watcher ~sw in
   let check = check_stats watcher in
   check "no hook" (0, 0);
   let unwatch_0 = Irmin_watcher.hook watcher 0 tmpdir ignore in
@@ -161,7 +163,7 @@ let unwatch ~fs ~clock () =
   Eio.Switch.run @@ fun sw ->
   let tmpdir = tmpdir fs in
   mkdir tmpdir;
-  let watcher = Irmin_watcher.v ~sw in
+  let watcher = watcher ~sw in
   let unwatch = Irmin_watcher.hook watcher 0 tmpdir ignore in
   unwatch ();
   Eio.Time.sleep clock 0.2;
@@ -181,14 +183,14 @@ let cleanup ~fs () =
   let tmpdir = tmpdir fs in
   mkdir tmpdir;
   Eio.Switch.run (fun sw ->
-      let watcher = Irmin_watcher.v ~sw in
+      let watcher = watcher ~sw in
       let unwatch_0 = Irmin_watcher.hook watcher 0 tmpdir ignore in
       unwatch_0 ();
       let unwatch_1 = Irmin_watcher.hook watcher 0 tmpdir ignore in
       unwatch_0 ();
       check_stats watcher "hook removed twice" (1, 1);
       unwatch_1 ());
-  let watcher = Eio.Switch.run (fun sw -> Irmin_watcher.v ~sw) in
+  let watcher = Eio.Switch.run (fun sw -> watcher ~sw) in
   (match Irmin_watcher.hook watcher 0 tmpdir ignore with
   | (_ : unit -> unit) ->
       Alcotest.fail "hook should fail once the switch is finished"
@@ -200,7 +202,7 @@ let failing_callback ~fs ~clock () =
   Eio.Switch.run @@ fun sw ->
   let tmpdir = tmpdir fs in
   mkdir tmpdir;
-  let watcher = Irmin_watcher.v ~sw in
+  let watcher = watcher ~sw in
   let events = Eio.Stream.create max_int in
   let take () =
     Eio.Time.with_timeout_exn clock 60. (fun () -> Eio.Stream.take events)
@@ -223,7 +225,7 @@ let relative ~cwd ~clock () =
   let dir = Eio.Path.(cwd / "irmin-watcher-relative") in
   Eio.Path.rmtree ~missing_ok:true dir;
   mkdir dir;
-  let watcher = Irmin_watcher.v ~sw in
+  let watcher = watcher ~sw in
   let events = Eio.Stream.create max_int in
   let unwatch = Irmin_watcher.hook watcher 0 dir (Eio.Stream.add events) in
   Eio.Path.save ~create:(`Or_truncate 0o600) Eio.Path.(dir / "foo") "foo";
@@ -285,6 +287,5 @@ let () =
   Lwt_eio.with_event_loop ~clock:env#clock @@ fun _ ->
   Logs.set_level (Some Logs.Debug);
   Logs.set_reporter (reporter ());
-  Irmin_watcher.set_polling_time 0.1;
   Alcotest.run "irmin-watch"
     (tests ~sw ~fs:env#fs ~cwd:env#cwd ~clock:env#clock)

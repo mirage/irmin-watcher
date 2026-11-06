@@ -196,8 +196,6 @@ let create ~sw listen =
   in
   { listen; watchdog }
 
-let default_polling_time = ref 1.
-
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
 

@@ -47,7 +47,7 @@ let listen dir i fn =
    blocking on incoming Inotify events instead of sleeping). We could
    probably do better, but at the moment it is more robust to do so,
    to avoid possible duplicated events. *)
-let v ~sw =
+let v ~sw ~polling_time:_ =
   let listen dir f =
     Log.info (fun l -> l "Inotify mode");
     Core.spawn ~sw (fun ~sw ~ready ->

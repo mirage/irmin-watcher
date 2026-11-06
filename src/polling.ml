@@ -13,15 +13,12 @@ let listen ~sw ~wait_for_changes dir callback =
   Core.spawn ~sw (fun ~sw:_ ~ready ->
       Hook.run ~ready ~wait_for_changes ~dir callback)
 
-let with_delay ~sw delay =
-  let wait_for_changes () = Eio_unix.sleep delay |> fun () -> `Unknown in
-  Core.create ~sw (listen ~sw ~wait_for_changes)
-
 let mode = `Polling
 
-let v ~sw =
+let v ~sw ~polling_time =
   let wait_for_changes () =
-    Eio_unix.sleep !Core.default_polling_time |> fun () -> `Unknown
+    Eio_unix.sleep polling_time;
+    `Unknown
   in
   Core.create ~sw (listen ~sw ~wait_for_changes)
 

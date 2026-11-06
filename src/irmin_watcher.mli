@@ -16,10 +16,11 @@ type t
 (** The type for watchers. A watcher runs at most one watchdog per directory,
     shared by all the hooks registered on that directory. *)
 
-val v : sw:Eio.Switch.t -> t
-(** [v ~sw] is a new watcher using the {!mode} backend. The fibers watching
-    directories are attached to [sw]. A program usually creates a single watcher
-    and registers all its hooks on it.
+val v : ?polling_time:float -> sw:Eio.Switch.t -> unit -> t
+(** [v ~sw ()] is a new watcher using the {!mode} backend. With the polling
+    backend, it scans the watched directories every [polling_time] seconds
+    (default [1.]). The fibers watching directories are attached to [sw]. A
+    program usually creates a single watcher and registers all its hooks on it.
 
     With the FSevents backend, the watcher runs Lwt code through [Lwt_eio]: an
     [Lwt_eio] event loop must be running (see [Lwt_eio.with_event_loop]). *)
@@ -38,10 +39,6 @@ type stats = { watchdogs : int; dispatches : int }
 
 val stats : t -> stats
 (** [stats t] is a snapshot of [t]'s statistics. *)
-
-val set_polling_time : float -> unit
-(** [set_polling_time f] set the polling interval to [f]. Only valid when
-    [mode = `Polling]. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

@@ -6,7 +6,11 @@
 
 type t = Core.t
 
-let v ~sw = Backend.v ~sw
+let v ?(polling_time = 1.) ~sw () =
+  if not (polling_time > 0.) then
+    invalid_arg "Irmin_watcher.v: polling_time must be positive";
+  Backend.v ~sw ~polling_time
+
 let mode = (Backend.mode :> [ `FSEvents | `Inotify | `Polling ])
 let hook = Core.hook
 
@@ -16,9 +20,6 @@ let stats t =
   let w = Core.watchdog t in
   let d = Core.Watchdog.dispatch w in
   { watchdogs = Core.Watchdog.length w; dispatches = Core.Dispatch.length d }
-
-let set_polling_time f =
-  match mode with `Polling -> Core.default_polling_time := f | _ -> ()
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

@@ -122,8 +122,6 @@ val spawn :
     [spawn] raises [Invalid_argument] if [sw] is cancelled. If the caller is
     cancelled before [f] is ready, [f] is cancelled too. *)
 
-val default_polling_time : float ref
-
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
 

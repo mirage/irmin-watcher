@@ -10,13 +10,9 @@
 
 open Core
 
-val with_delay : sw:Eio.Switch.t -> float -> t
-(** [with_delay delay id p f] is the hook calling [f] everytime a sub-path of
-    [p] is modified. Return a function to call to remove the hook. Active
-    polling is done every [delay] seconds. *)
-
-val v : sw:Eio.Switch.t -> t
-(** [v] is [with_delay !default_polling_time]. *)
+val v : sw:Eio.Switch.t -> polling_time:float -> t
+(** [v ~sw ~polling_time] is the watcher scanning the watched directories every
+    [polling_time] seconds. *)
 
 val mode : [ `Polling ]
 
