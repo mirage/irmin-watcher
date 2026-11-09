@@ -85,21 +85,21 @@ let v ~sw ~polling_time:_ =
   let listen dir f =
     Log.info (fun l -> l "FSevents mode");
     Core.spawn ~sw (fun ~sw ~ready ->
-        let events = ref [] in
+        (* Every change triggers a full scan: pending changes are merged. *)
+        let pending = ref false in
         let cond = Lwt_condition.create () in
         let stream = start_runloop ~sw dir in
         let rec wait_for_changes () =
-          match List.rev !events with
-          | [] -> Lwt_condition.wait cond >>= wait_for_changes
-          | _h :: t ->
-              events := List.rev t;
-              Lwt.return `Unknown
+          if !pending then (
+            pending := false;
+            Lwt.return `Unknown)
+          else Lwt_condition.wait cond >>= wait_for_changes
         in
         let wait_for_changes () = Lwt_eio.run_lwt wait_for_changes in
         Eio.Fiber.both
           (fun () ->
-            listen dir stream (fun path ->
-                events := path :: !events;
+            listen dir stream (fun _path ->
+                pending := true;
                 Lwt_condition.signal cond ();
                 Lwt.return_unit))
           (fun () -> Hook.run ~ready ~wait_for_changes ~dir f))
