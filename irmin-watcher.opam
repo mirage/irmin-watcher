@@ -25,6 +25,7 @@ depends: [
   "cf-lwt" {>= "0.4" & os = "macos"}
   "lwt" {os = "macos"}
   "eio" {>= "1.6"}
+  "optint"
   "eio_main" {with-test & >= "1.0"}
   "logs"
   "fmt"

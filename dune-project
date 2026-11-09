@@ -42,6 +42,7 @@
    (= :os "macos"))
   (eio
    (>= "1.6"))
+  optint
   (eio_main
    (and
     :with-test

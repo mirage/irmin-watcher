@@ -25,11 +25,22 @@ let is_symlink_loop = function
   | Eio.Io (Eio.Fs.E Eio.Fs.Symlink, _) -> true
   | _ -> false
 
-(* [digest f] is the digest of the regular file [f], or [None] if [f] has been
-   removed. It raises the other errors. [Digest.file] reads [f] in constant
-   memory. *)
-let digest f =
-  try Some (Digest.file (Eio.Path.native_exn f))
+(* Files larger than this are digested in a system thread, so that reading them
+   does not block the other fibers. Smaller files are read directly, which is
+   cheaper. *)
+let large_file = 1 lsl 20
+
+(* [digest ~size f] is the digest of the regular file [f] of [size] bytes, or
+   [None] if [f] has been removed. It raises the other errors. [Digest.file]
+   reads [f] in constant memory. *)
+let digest ~size f =
+  let path = Eio.Path.native_exn f in
+  let digest () = Digest.file path in
+  try
+    Some
+      (if Optint.Int63.to_int size > large_file then
+         Eio_unix.run_in_systhread ~label:"irmin-watcher digest" digest
+       else digest ())
   with Sys_error _ when Eio.Path.kind ~follow:true f = `Not_found -> None
 
 (* [entry f] is what a scan does with [f]: [`Directory] if it is a directory,
@@ -56,7 +67,9 @@ let entry f =
    missing file. *)
 let read_file dir rel =
   let f = dir / rel in
-  match entry f with `File _ -> digest f | `Directory | `Skip -> None
+  match entry f with
+  | `File { size; _ } -> digest ~size f
+  | `Directory | `Skip -> None
 
 (* The result of a scan: the digests of the files that could be read, and the
    paths of the files and directories that could not. *)
@@ -82,8 +95,8 @@ let scan dir =
     let f = path dir rel in
     match entry f with
     | `Directory -> read_dir acc rel
-    | `File _ -> (
-        match digest f with
+    | `File { size; _ } -> (
+        match digest ~size f with
         | Some d -> { acc with digests = Digests.add (rel, d) acc.digests }
         | None -> acc
         | exception ((Eio.Io _ | Sys_error _) as ex) -> failed acc rel ex)
