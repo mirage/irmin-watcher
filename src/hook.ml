@@ -71,14 +71,23 @@ let read_file dir rel =
   | `File { size; _ } -> digest ~size f
   | `Directory | `Skip -> None
 
+module Paths = Set.Make (String)
+
+(* [log_failure ~known dir rel ex] logs that [rel] cannot be read. A path in
+   [known] already failed before: it is only logged at the debug level, so
+   that a path that stays unreadable does not log a warning at every scan. *)
+let log_failure ~known dir rel ex =
+  let level = if Paths.mem rel known then Logs.Debug else Logs.Warning in
+  Log.msg level (fun l ->
+      l "cannot read %a: %a" Eio.Path.pp (path dir rel) Fmt.exn ex)
+
 (* The result of a scan: the digests of the files that could be read, and the
    paths of the files and directories that could not. *)
 type scan = { digests : Digests.t; failed : string list }
 
-let scan dir =
+let scan ~known dir =
   let failed acc rel ex =
-    Log.warn (fun l ->
-        l "cannot read %a: %a" Eio.Path.pp (path dir rel) Fmt.exn ex);
+    log_failure ~known dir rel ex;
     { acc with failed = rel :: acc.failed }
   in
   let rec read_dir acc rel =
@@ -112,8 +121,6 @@ let scan dir =
 (* [merge ~previous scan] is the digests of [scan], plus the digests of
    [previous] for the paths that could not be read: their changes are not
    known yet. *)
-module Paths = Set.Make (String)
-
 let merge ~previous { digests; failed } =
   if failed = [] then digests
   else if List.mem "" failed then Digests.union digests previous
@@ -131,22 +138,22 @@ let merge ~previous { digests; failed } =
 
 type event = [ `Unknown | `File of string ]
 
-(* [update dir files event] is the new state of [dir] after [event], and
-   whether all the files concerned could be read. *)
-let update dir files (event : event) =
+(* [update ~known dir files event] is the new state of [dir] after [event],
+   whether all the files concerned could be read, and the paths that are known
+   to fail. *)
+let update ~known dir files (event : event) =
   match event with
   | `Unknown ->
-      let scan = scan dir in
-      (merge ~previous:files scan, scan.failed = [])
+      let scan = scan ~known dir in
+      (merge ~previous:files scan, scan.failed = [], Paths.of_list scan.failed)
   | `File rel -> (
       let others = Digests.filter (fun (x, _) -> x <> rel) files in
       match read_file dir rel with
-      | None -> (others, true)
-      | Some d -> (Digests.add (rel, d) others, true)
+      | None -> (others, true, Paths.remove rel known)
+      | Some d -> (Digests.add (rel, d) others, true, Paths.remove rel known)
       | exception ((Eio.Io _ | Sys_error _) as ex) ->
-          Log.warn (fun l ->
-              l "cannot read %a: %a" Eio.Path.pp (dir / rel) Fmt.exn ex);
-          (files, false))
+          log_failure ~known dir rel ex;
+          (files, false, Paths.add rel known))
 
 let report n ~callback dir files new_files =
   Log.debug (fun l ->
@@ -183,9 +190,9 @@ let run ~ready ~wait_for_changes ~dir callback =
             Eio_unix.sleep (Float.max 0. (deadline -. now ()));
             `Unknown)
   in
-  let rec loop files ~retry =
+  let rec loop files ~known ~retry =
     let event = wait retry in
-    let new_files, complete = update dir files event in
+    let new_files, complete, known = update ~known dir files event in
     report n ~callback dir files new_files;
     let retry =
       match (event, complete, retry) with
@@ -193,11 +200,13 @@ let run ~ready ~wait_for_changes ~dir callback =
       | `Unknown, false, _ | `File _, false, None -> next_retry retry
       | `File _, _, _ -> retry
     in
-    loop new_files ~retry
+    loop new_files ~known ~retry
   in
-  let scan = scan dir in
+  let scan = scan ~known:Paths.empty dir in
   ready ();
-  loop scan.digests ~retry:(if scan.failed = [] then None else next_retry None)
+  loop scan.digests
+    ~known:(Paths.of_list scan.failed)
+    ~retry:(if scan.failed = [] then None else next_retry None)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
