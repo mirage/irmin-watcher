@@ -13,27 +13,56 @@ module Log = (val Logs.src_log src : Logs.LOG)
 let create_flags = Fsevents.CreateFlags.detailed_interactive
 let run_loop_mode = Cf.RunLoop.Mode.Default
 
-let start_runloop dir =
+(* [release watcher ~started runloop] frees the stream [watcher] and stops its
+   run loop. A started stream may still be delivering events through the Lwt
+   event loop, so it is freed once they are delivered. Without a running Lwt
+   event loop, the stream leaks rather than blocking the caller. *)
+let release watcher ~started runloop =
+  let free () =
+    Fsevents_lwt.invalidate watcher;
+    Fsevents_lwt.release watcher;
+    Cf.RunLoop.stop runloop
+  in
+  if not started then free ()
+  else (
+    Fsevents_lwt.stop watcher;
+    Lwt.async (fun () ->
+        Lwt.catch
+          (fun () -> Fsevents_lwt.flush watcher >|= free)
+          (fun ex ->
+            Log.err (fun l ->
+                l "cannot release the FSEvents stream: %a" Fmt.exn ex);
+            Lwt.return_unit)))
+
+let start_runloop ~sw dir =
   let dir = Eio.Path.native_exn dir in
   Log.debug (fun l -> l "start_runloop %s" dir);
   let watcher = Fsevents_lwt.create 0. create_flags [ dir ] in
   let stream = Fsevents_lwt.stream watcher in
   let event_stream = Fsevents_lwt.event_stream watcher in
-  let _scheduler =
-    Lwt_eio.run_lwt @@ fun () ->
+  (* The run loop thread only records whether the stream started: the result
+     is read on the Eio side. *)
+  let start = Atomic.make false in
+  let scheduler =
     Cf_lwt.RunLoop.run_thread (fun runloop ->
         Fsevents.schedule_with_run_loop event_stream runloop run_loop_mode;
-        if not (Fsevents.start event_stream) then
-          prerr_endline "failed to start FSEvents stream")
+        Atomic.set start (Fsevents.start event_stream))
   in
-  (* FIXME: should probably do something with the scheduler *)
-  let stop_scheduler () =
-    (Lwt_eio.run_lwt @@ fun () -> Fsevents_lwt.flush watcher);
-    Fsevents_lwt.stop watcher;
-    Fsevents_lwt.invalidate watcher;
-    Fsevents_lwt.release watcher
-  in
-  (stream, stop_scheduler)
+  match Lwt_eio.Promise.await_lwt scheduler with
+  | runloop ->
+      let started = Atomic.get start in
+      Eio.Switch.on_release sw (fun () -> release watcher ~started runloop);
+      if not started then
+        Fmt.failwith "Irmin_watcher: cannot start the FSEvents stream for %s"
+          dir;
+      stream
+  | exception (Eio.Cancel.Cancelled _ as e) ->
+      let bt = Printexc.get_raw_backtrace () in
+      (* The run loop thread is still starting the stream: release it once
+         the thread is done. *)
+      Lwt.on_success scheduler (fun runloop ->
+          release watcher ~started:(Atomic.get start) runloop);
+      Printexc.raise_with_backtrace e bt
 
 let listen dir stream fn =
   let path_of_event { Fsevents_lwt.path; _ } = path in
@@ -58,8 +87,7 @@ let v ~sw ~polling_time:_ =
     Core.spawn ~sw (fun ~sw ~ready ->
         let events = ref [] in
         let cond = Lwt_condition.create () in
-        let stream, stop_runloop = start_runloop dir in
-        Eio.Switch.on_release sw stop_runloop;
+        let stream = start_runloop ~sw dir in
         let rec wait_for_changes () =
           match List.rev !events with
           | [] -> Lwt_condition.wait cond >>= wait_for_changes
