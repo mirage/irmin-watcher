@@ -41,10 +41,12 @@ val hook :
     [hook] returns once [p] has been read: later changes are reported. It raises
     the errors met while starting to watch [p]. The files and directories under
     [p] that cannot be read are logged, keep their previous state, and are read
-    again later. With the Inotify backend, [p] is created if it does not exist,
-    the changes to the files in sub-directories of [p] are only reported when a
-    sub-directory is created, removed or renamed, and no change is reported any
-    more once [p] is removed.
+    again later. Symbolic links to directories are not followed, while symbolic
+    links to files are read. With the Inotify backend, [p] is created if it does
+    not exist, the changes to the files in sub-directories of [p], and to the
+    targets of symbolic links, are only reported when a sub-directory is
+    created, removed or renamed, and no change is reported any more once [p] is
+    removed.
 
     [f] runs in a fiber attached to the switch of [t], possibly at the same time
     as other callbacks. The watcher waits for the callbacks before looking for

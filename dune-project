@@ -22,7 +22,7 @@
   "irmin-watcher implements [Irmin's watch hooks][watch] for various OS,\nusing FSevents in macOS and Inotify on Linux.\n\nirmin-watcher is distributed under the ISC license.\n\n[watch]: http://mirage.github.io/irmin/irmin/Irmin/Private/Watch/index.html#type-hook\n")
  (depends
   (ocaml
-   (>= "5.1.0"))
+   (>= "5.2.0"))
   (alcotest :with-test)
   (mtime
    (>= "2.1.0"))
@@ -41,7 +41,7 @@
   (lwt
    (= :os "macos"))
   (eio
-   (>= "1.0"))
+   (>= "1.6"))
   (eio_main
    (and
     :with-test

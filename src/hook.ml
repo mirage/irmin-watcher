@@ -21,6 +21,10 @@ let is_missing = function
   | Eio.Io (Eio.Fs.E (Eio.Fs.Not_found _), _) -> true
   | _ -> false
 
+let is_symlink_loop = function
+  | Eio.Io (Eio.Fs.E Eio.Fs.Symlink, _) -> true
+  | _ -> false
+
 (* [digest f] is the digest of the regular file [f], or [None] if [f] has been
    removed. It raises the other errors. [Digest.file] reads [f] in constant
    memory. *)
@@ -28,13 +32,31 @@ let digest f =
   try Some (Digest.file (Eio.Path.native_exn f))
   with Sys_error _ when Eio.Path.kind ~follow:true f = `Not_found -> None
 
-(* [read_file dir rel] is the digest of the file [rel], or [None] if it is not
-   a regular file. It raises the errors other than a missing file. *)
+(* [entry f] is what a scan does with [f]: [`Directory] if it is a directory,
+   [`File stat] if it is a regular file or a symbolic link to one, of status
+   [stat], and [`Skip] otherwise, including when [f] is missing. Symbolic links
+   to directories are not followed: they can lead out of the watched
+   directory, or back into it. It raises the other errors. *)
+let entry f =
+  match Eio.Path.stat ~follow:false f with
+  | { kind = `Directory; _ } -> `Directory
+  | { kind = `Regular_file; _ } as stat -> `File stat
+  | { kind = `Symbolic_link; _ } -> (
+      match Eio.Path.stat ~follow:true f with
+      | { kind = `Regular_file; _ } as stat -> `File stat
+      | _ -> `Skip
+      | exception (Eio.Io _ as ex) when is_missing ex || is_symlink_loop ex ->
+          (* A dangling symbolic link, or a loop of symbolic links. *)
+          `Skip)
+  | _ -> `Skip
+  | exception (Eio.Io _ as ex) when is_missing ex -> `Skip
+
+(* [read_file dir rel] is the digest of the file [rel], or [None] if a scan
+   would skip it or if it is a directory. It raises the errors other than a
+   missing file. *)
 let read_file dir rel =
   let f = dir / rel in
-  match Eio.Path.kind ~follow:true f with
-  | `Regular_file -> digest f
-  | _ -> None
+  match entry f with `File _ -> digest f | `Directory | `Skip -> None
 
 (* The result of a scan: the digests of the files that could be read, and the
    paths of the files and directories that could not. *)
@@ -57,15 +79,15 @@ let scan dir =
         acc
     | exception (Eio.Io _ as ex) -> failed acc rel ex
   and read_entry acc rel =
-    let f = dir / rel in
-    match Eio.Path.kind ~follow:true f with
+    let f = path dir rel in
+    match entry f with
     | `Directory -> read_dir acc rel
-    | `Regular_file -> (
+    | `File _ -> (
         match digest f with
         | Some d -> { acc with digests = Digests.add (rel, d) acc.digests }
         | None -> acc
         | exception ((Eio.Io _ | Sys_error _) as ex) -> failed acc rel ex)
-    | _ -> acc
+    | `Skip -> acc
     | exception (Eio.Io _ as ex) -> failed acc rel ex
   in
   let empty = { digests = Digests.empty; failed = [] } in

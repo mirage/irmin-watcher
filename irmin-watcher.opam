@@ -17,14 +17,14 @@ doc: "https://mirage.github.io/irmin-watcher/"
 bug-reports: "https://github.com/mirage/irmin-watcher/issues"
 depends: [
   "dune" {>= "2.8"}
-  "ocaml" {>= "5.1.0"}
+  "ocaml" {>= "5.2.0"}
   "alcotest" {with-test}
   "mtime" {>= "2.1.0"}
   "inotify" {>= "2.6" & os = "linux"}
   "inotify-eio" {>= "2.6" & os = "linux"}
   "cf-lwt" {>= "0.4" & os = "macos"}
   "lwt" {os = "macos"}
-  "eio" {>= "1.0"}
+  "eio" {>= "1.6"}
   "eio_main" {with-test & >= "1.0"}
   "logs"
   "fmt"

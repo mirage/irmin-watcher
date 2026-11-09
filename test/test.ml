@@ -400,6 +400,47 @@ let pending_rescan ~fs ~clock () =
   if not !seen_secret then wait_for ~clock events "secret";
   unwatch ()
 
+(* Symbolic links to directories are not followed, whether they lead back into
+   the watched directory or out of it, but symbolic links to files are read.
+   Loops of symbolic links are not reported as errors. *)
+let symlinks ~fs ~clock () =
+  Eio.Switch.run @@ fun sw ->
+  let tmpdir = tmpdir fs in
+  let dir = Eio.Path.(tmpdir / "w") in
+  write ~sw ~fs "w/sub/foo" "foo";
+  write ~sw ~fs "out/foo" "foo";
+  let link target name =
+    Unix.symlink target Eio.Path.(native_exn (tmpdir / name))
+  in
+  link "." "w/self";
+  link ".." "w/sub/parent";
+  link "../out" "w/out";
+  link "loop" "w/loop";
+  let watcher = watcher ~sw in
+  let events = Eio.Stream.create max_int in
+  let unwatch =
+    Eio.Time.with_timeout_exn clock 10. (fun () ->
+        Irmin_watcher.hook watcher 0 dir (Eio.Stream.add events))
+  in
+  write ~sw ~fs "out/bar" "bar";
+  link "../out/foo" "w/file";
+  (* With Inotify, creating a directory triggers a full scan. *)
+  mkdir Eio.Path.(dir / "d");
+  write ~sw ~fs "w/top" "top";
+  (* Every event until both [file] and [top] are reported. *)
+  let seen =
+    Eio.Time.with_timeout_exn clock 60. (fun () ->
+        let rec loop seen =
+          if List.mem "file" seen && List.mem "top" seen then seen
+          else loop (Eio.Stream.take events :: seen)
+        in
+        loop [])
+  in
+  Alcotest.(check (list string))
+    "only the changed files" []
+    (List.filter (fun e -> e <> "file" && e <> "top") (seen @ drain events));
+  unwatch ()
+
 (* Renaming a sub-directory reports the files under it, at their old and new
    paths. *)
 let renamed_dir ~fs ~clock () =
@@ -437,6 +478,7 @@ let polling_tests ~sw ~fs ~cwd ~clock =
     ("relative", `Quick, relative ~cwd ~clock);
     ("unreadable file", `Quick, run ~fs (unreadable ~fs ~clock));
     ("pending rescan", `Quick, run ~fs (pending_rescan ~fs ~clock));
+    ("symbolic links", `Quick, run ~fs (symlinks ~fs ~clock));
     ("renamed directory", `Quick, run ~fs (renamed_dir ~fs ~clock));
     ("polling time", `Quick, polling_time);
     ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
