@@ -86,7 +86,16 @@ module Dispatch = struct
     Fiber.List.iter
       (fun (id, f) ->
         Log.debug (fun f -> f "callback %d" id);
-        f file)
+        (* A failing callback must not stop the watchdog, which other
+           callbacks share. *)
+        try f file with
+        | Cancel.Cancelled _ as e ->
+            Printexc.raise_with_backtrace e (Printexc.get_raw_backtrace ())
+        | e ->
+            let bt = Printexc.get_raw_backtrace () in
+            Log.err (fun l ->
+                l "callback %d failed on %s: %a" id file Fmt.exn_backtrace
+                  (e, bt)))
       fns
 
   let add t ~id ~dir fn =

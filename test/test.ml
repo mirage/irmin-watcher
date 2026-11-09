@@ -195,6 +195,27 @@ let cleanup ~fs () =
   | exception Invalid_argument _ -> ());
   check_stats watcher "failed hook" (0, 0)
 
+(* A failing callback stops neither the watcher nor the other callbacks. *)
+let failing_callback ~fs ~clock () =
+  Eio.Switch.run @@ fun sw ->
+  let tmpdir = tmpdir fs in
+  mkdir tmpdir;
+  let watcher = Irmin_watcher.v ~sw in
+  let events = Eio.Stream.create max_int in
+  let take () =
+    Eio.Time.with_timeout_exn clock 60. (fun () -> Eio.Stream.take events)
+  in
+  let unwatch_0 =
+    Irmin_watcher.hook watcher 0 tmpdir (fun _ -> failwith "callback failure")
+  in
+  let unwatch_1 = Irmin_watcher.hook watcher 1 tmpdir (Eio.Stream.add events) in
+  write ~sw ~fs "foo" "foo";
+  Alcotest.(check string) "first change" "foo" (take ());
+  write ~sw ~fs "bar" "bar";
+  Alcotest.(check string) "second change" "bar" (take ());
+  unwatch_0 ();
+  unwatch_1 ()
+
 (* Callbacks receive paths relative to the watched directory, which can itself
    be relative to the current directory. *)
 let relative ~cwd ~clock () =
@@ -218,6 +239,7 @@ let polling_tests ~sw ~fs ~cwd ~clock =
     ("stats", `Quick, run ~fs (stats ~fs));
     ("unwatch", `Quick, run ~fs (unwatch ~fs ~clock));
     ("cleanup", `Quick, run ~fs (cleanup ~fs));
+    ("failing callback", `Quick, run ~fs (failing_callback ~fs ~clock));
     ("relative", `Quick, relative ~cwd ~clock);
     ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
     ("basic", `Quick, run ~fs (poll ~fs ~clock ~mkdir:true 0));
