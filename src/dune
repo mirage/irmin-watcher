@@ -1,7 +1,4 @@
 (library
- (foreign_stubs
-  (language c)
-  (names realpath))
  (name irmin_watcher)
  (public_name irmin-watcher)
  (libraries

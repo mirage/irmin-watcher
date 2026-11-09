@@ -17,6 +17,8 @@
     met while starting to watch it. It raises `Invalid_argument` once the
     switch of the watcher is cancelled.
   - Callbacks always receive paths with `/` as separator, also on Windows.
+  - Watched directories are no longer resolved with `realpath`: a directory
+    reached through two different paths gets two watchdogs.
   - Exceptions raised by callbacks are logged.
   - The FSevents backend (macOS) needs a running `Lwt_eio` event loop.
 - Removing a hook twice no longer removes another hook with the same id.
