@@ -29,7 +29,8 @@ val v : ?polling_time:float -> sw:Eio.Switch.t -> unit -> t
     [sw].
 
     With the FSevents backend, the watcher runs Lwt code through [Lwt_eio]: an
-    [Lwt_eio] event loop must be running (see [Lwt_eio.with_event_loop]). *)
+    [Lwt_eio] event loop must be running in the domain of [sw] for as long as
+    [sw] (see [Lwt_eio.with_event_loop]). *)
 
 val hook :
   t -> int -> Eio.Fs.dir_ty Eio.Path.t -> (string -> unit) -> unit -> unit
