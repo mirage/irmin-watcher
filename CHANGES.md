@@ -26,6 +26,7 @@
 - A directory removed while it is scanned no longer stops the watcher.
 - Files that cannot be read keep their previous state and are read again
   later, instead of being reported as removed.
+- Scan the watched directory once instead of twice when a hook starts.
 - With Inotify, rescan the directory when a sub-directory changes or when the
   event queue overflows.
 - Require OCaml 5.1 or later.

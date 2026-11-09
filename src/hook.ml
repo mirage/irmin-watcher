@@ -137,11 +137,10 @@ let run ~ready ~wait_for_changes ~dir callback =
     report n ~callback dir files new_files;
     loop new_files ~retry:(if complete then None else Some (next_delay retry))
   in
-  let files = (scan dir).digests in
+  let scan = scan dir in
   ready ();
-  let new_files, complete = update dir files `Unknown in
-  report n ~callback dir files new_files;
-  loop new_files ~retry:(if complete then None else Some (next_delay None))
+  loop scan.digests
+    ~retry:(if scan.failed = [] then None else Some (next_delay None))
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire
