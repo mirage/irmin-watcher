@@ -36,6 +36,11 @@ let release watcher ~started runloop =
 
 let start_runloop ~sw dir =
   let dir = Eio.Path.native_exn dir in
+  (* FSEvents needs absolute paths. *)
+  let dir =
+    if Filename.is_relative dir then Filename.concat (Sys.getcwd ()) dir
+    else dir
+  in
   Log.debug (fun l -> l "start_runloop %s" dir);
   let watcher = Fsevents_lwt.create 0. create_flags [ dir ] in
   let stream = Fsevents_lwt.stream watcher in
