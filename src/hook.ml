@@ -77,14 +77,22 @@ let scan dir =
 (* [merge ~previous scan] is the digests of [scan], plus the digests of
    [previous] for the paths that could not be read: their changes are not
    known yet. *)
+module Paths = Set.Make (String)
+
 let merge ~previous { digests; failed } =
-  let under rel failed =
-    failed = "" || rel = failed || String.starts_with ~prefix:(failed ^ "/") rel
-  in
   if failed = [] then digests
+  else if List.mem "" failed then Digests.union digests previous
   else
-    Digests.union digests
-      (Digests.filter (fun (rel, _) -> List.exists (under rel) failed) previous)
+    let failed = Paths.of_list failed in
+    (* [rel] is under a failed path if it or one of its parents failed. *)
+    let rec under rel =
+      Paths.mem rel failed
+      ||
+      match String.rindex_opt rel '/' with
+      | Some i -> under (String.sub rel 0 i)
+      | None -> false
+    in
+    Digests.union digests (Digests.filter (fun (rel, _) -> under rel) previous)
 
 type event = [ `Unknown | `File of string ]
 
