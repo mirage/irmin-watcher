@@ -114,11 +114,19 @@ let report n ~callback dir files new_files =
         f "[%d] polling %a: diff:%a" n Eio.Path.pp dir Digests.pp diff);
     Fiber.List.iter callback (Digests.files diff))
 
-(* After a failed read, rescan after [delay] seconds even without a new event,
-   doubling the delay up to a minute while reads keep failing. *)
-let next_delay = function
-  | None -> 1.
-  | Some delay -> Float.min 60. (2. *. delay)
+(* After a failed read, rescan once a delay has passed, even without a new
+   event. The delay doubles up to a minute while full scans keep failing. Only
+   a complete full scan cancels the pending rescan. *)
+type retry = { deadline : float; delay : float }
+
+(* [now ()] is the time in seconds on a monotonic clock, which a change of the
+   system time does not affect. *)
+let now () = Mtime.Span.to_float_ns (Mtime_clock.elapsed ()) *. 1e-9
+let schedule delay = Some { deadline = now () +. delay; delay }
+
+let next_retry = function
+  | None -> schedule 1.
+  | Some { delay; _ } -> schedule (Float.min 60. (2. *. delay))
 
 let id = ref 0
 
@@ -127,20 +135,26 @@ let run ~ready ~wait_for_changes ~dir callback =
   incr id;
   let wait = function
     | None -> wait_for_changes ()
-    | Some delay ->
+    | Some { deadline; _ } ->
         Fiber.first wait_for_changes (fun () ->
-            Eio_unix.sleep delay;
+            Eio_unix.sleep (Float.max 0. (deadline -. now ()));
             `Unknown)
   in
   let rec loop files ~retry =
-    let new_files, complete = update dir files (wait retry) in
+    let event = wait retry in
+    let new_files, complete = update dir files event in
     report n ~callback dir files new_files;
-    loop new_files ~retry:(if complete then None else Some (next_delay retry))
+    let retry =
+      match (event, complete, retry) with
+      | `Unknown, true, _ -> None
+      | `Unknown, false, _ | `File _, false, None -> next_retry retry
+      | `File _, _, _ -> retry
+    in
+    loop new_files ~retry
   in
   let scan = scan dir in
   ready ();
-  loop scan.digests
-    ~retry:(if scan.failed = [] then None else Some (next_delay None))
+  loop scan.digests ~retry:(if scan.failed = [] then None else next_retry None)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

@@ -7,7 +7,7 @@
   lwt_eio
   irmin-watcher
   mtime
-  mtime.clock.os
+  mtime.clock
   unix))
 
 (rule

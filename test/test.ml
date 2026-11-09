@@ -368,6 +368,38 @@ let unreadable ~fs ~clock () =
   wait_for ~clock events "top";
   unwatch ()
 
+(* A file that cannot be read when it changes is reported once it can be read
+   again, even when another file changes in the meantime. *)
+let pending_rescan ~fs ~clock () =
+  Eio.Switch.run @@ fun sw ->
+  let tmpdir = tmpdir fs in
+  mkdir tmpdir;
+  let secret = Eio.Path.(native_exn (tmpdir / "secret")) in
+  write ~sw ~fs "secret" "A";
+  Fun.protect ~finally:(fun () -> Unix.chmod secret 0o600) @@ fun () ->
+  let watcher = watcher ~sw in
+  let events = Eio.Stream.create max_int in
+  let unwatch = Irmin_watcher.hook watcher 0 tmpdir (Eio.Stream.add events) in
+  Unix.chmod secret 0o200;
+  Out_channel.with_open_gen [ Open_wronly; Open_trunc ] 0o200 secret (fun oc ->
+      Out_channel.output_string oc "B");
+  write ~sw ~fs "top" "top";
+  (* Wait for [top], noting whether [secret] was read anyway (as root). *)
+  let seen_secret = ref false in
+  Eio.Time.with_timeout_exn clock 60. (fun () ->
+      let rec loop () =
+        match Eio.Stream.take events with
+        | "top" -> ()
+        | "secret" ->
+            seen_secret := true;
+            loop ()
+        | _ -> loop ()
+      in
+      loop ());
+  Unix.chmod secret 0o600;
+  if not !seen_secret then wait_for ~clock events "secret";
+  unwatch ()
+
 (* Renaming a sub-directory reports the files under it, at their old and new
    paths. *)
 let renamed_dir ~fs ~clock () =
@@ -404,6 +436,7 @@ let polling_tests ~sw ~fs ~cwd ~clock =
     ("failing callback", `Quick, run ~fs (failing_callback ~fs ~clock));
     ("relative", `Quick, relative ~cwd ~clock);
     ("unreadable file", `Quick, run ~fs (unreadable ~fs ~clock));
+    ("pending rescan", `Quick, run ~fs (pending_rescan ~fs ~clock));
     ("renamed directory", `Quick, run ~fs (renamed_dir ~fs ~clock));
     ("polling time", `Quick, polling_time);
     ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
