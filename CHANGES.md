@@ -27,6 +27,12 @@
 - Files that cannot be read keep their previous state and are read again
   later, instead of being reported as removed.
 - Scan the watched directory once instead of twice when a hook starts.
+- Do not follow symbolic links to directories: a link to a parent directory
+  made scans very slow, or endless, and a link out of the watched directory
+  made every scan read the target too. Symbolic links to files are still
+  read.
+- Digest the files larger than 1 MB in a system thread, so that the other
+  fibers keep running.
 - With Inotify, rescan the directory when a sub-directory changes or when the
   event queue overflows.
 - Require OCaml 5.2 and Eio 1.6 or later.
