@@ -42,8 +42,9 @@ val hook :
     the errors met while starting to watch [p]. The files and directories under
     [p] that cannot be read are logged, keep their previous state, and are read
     again later. With the Inotify backend, [p] is created if it does not exist,
-    only the changes to the files directly in [p] are reported, and no change is
-    reported any more once [p] is removed.
+    the changes to the files in sub-directories of [p] are only reported when a
+    sub-directory is created, removed or renamed, and no change is reported any
+    more once [p] is removed.
 
     [f] runs in a fiber attached to the switch of [t], possibly at the same time
     as other callbacks. The watcher waits for the callbacks before looking for

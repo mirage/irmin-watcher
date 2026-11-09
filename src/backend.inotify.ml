@@ -33,8 +33,12 @@ let listen dir i fn =
           Fmt.(Dump.list pp_kind)
           es);
     (* An event without a file name is about [dir] itself, or a queue
-       overflow: rescan the whole directory. *)
-    fn (match name with None -> `Unknown | Some name -> `File name);
+       overflow. An event on a sub-directory concerns all the files under it.
+       Rescan the whole directory in both cases. *)
+    fn
+      (match name with
+      | Some name when not (List.mem Inotify.Isdir es) -> `File name
+      | _ -> `Unknown);
     iter ()
   in
   iter ()
@@ -50,7 +54,19 @@ let v ~sw ~polling_time:_ =
     Core.spawn ~sw (fun ~sw ~ready ->
         let i = start_watch ~sw dir in
         let events = Eio.Stream.create max_int in
-        let wait_for_changes () = Eio.Stream.take events in
+        let rec drain () =
+          match Eio.Stream.take_nonblocking events with
+          | Some _ -> drain ()
+          | None -> ()
+        in
+        let wait_for_changes () =
+          match Eio.Stream.take events with
+          | `File _ as e -> e
+          | `Unknown ->
+              (* A full scan covers the changes queued so far. *)
+              drain ();
+              `Unknown
+        in
         Eio.Fiber.both
           (fun () -> listen dir i (Eio.Stream.add events))
           (fun () -> Hook.run ~ready ~wait_for_changes ~dir f))
