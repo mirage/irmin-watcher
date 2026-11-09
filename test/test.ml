@@ -141,12 +141,28 @@ let check_stats watcher msg (watchdogs, dispatches) =
     msg (watchdogs, dispatches)
     (stats.watchdogs, stats.dispatches)
 
-(* [wait_for ~clock events name] takes the elements of [events] until [name]:
-   writing a file can report it more than once. *)
-let wait_for ~clock events name =
+(* [wait_for_all ~clock events names] takes the elements of [events] until it
+   has seen all of [names]: writing a file can report it more than once. *)
+let wait_for_all ~clock events names =
   Eio.Time.with_timeout_exn clock 60. (fun () ->
-      let rec loop () = if Eio.Stream.take events <> name then loop () in
-      loop ())
+      let rec loop = function
+        | [] -> ()
+        | names ->
+            let name = Eio.Stream.take events in
+            loop (List.filter (( <> ) name) names)
+      in
+      loop names)
+
+let wait_for ~clock events name = wait_for_all ~clock events [ name ]
+
+let drain events =
+  List.init (Eio.Stream.length events) (fun _ -> Eio.Stream.take events)
+
+(* The number of open file descriptors, where it is known. *)
+let open_fds () =
+  match Sys.readdir "/proc/self/fd" with
+  | fds -> Some (Array.length fds)
+  | exception Sys_error _ -> None
 
 let stats ~fs () =
   Eio.Switch.run @@ fun sw ->
@@ -174,15 +190,32 @@ let unwatch ~fs ~clock () =
   let unwatch = Irmin_watcher.hook watcher 0 tmpdir ignore in
   unwatch ();
   Eio.Time.sleep clock 0.2;
+  let events = Eio.Stream.create max_int in
   let unwatch_0, unwatch_1 =
     Fiber.pair
-      (fun () -> Irmin_watcher.hook watcher 0 tmpdir ignore)
+      (fun () -> Irmin_watcher.hook watcher 0 tmpdir (Eio.Stream.add events))
       (fun () -> Irmin_watcher.hook watcher 1 tmpdir ignore)
   in
+  check_stats watcher "one watchdog" (1, 2);
+  write ~sw ~fs "foo" "foo";
+  wait_for ~clock events "foo";
   unwatch_0 ();
   unwatch_1 ();
   Eio.Time.sleep clock 0.2;
   check_stats watcher "no watchdog left" (0, 0)
+
+(* Two hooks can start at the same time on a missing directory. *)
+let missing_dir ~fs () =
+  Eio.Switch.run @@ fun sw ->
+  let dir = Eio.Path.(tmpdir fs / "missing") in
+  let watcher = watcher ~sw in
+  let unwatch_0, unwatch_1 =
+    Fiber.pair
+      (fun () -> Irmin_watcher.hook watcher 0 dir ignore)
+      (fun () -> Irmin_watcher.hook watcher 1 dir ignore)
+  in
+  unwatch_0 ();
+  unwatch_1 ()
 
 (* Removing a hook twice does not remove a later hook with the same id, and a
    hook that fails to start leaves nothing behind. *)
@@ -203,6 +236,55 @@ let cleanup ~fs () =
       Alcotest.fail "hook should fail once the switch is finished"
   | exception Invalid_argument _ -> ());
   check_stats watcher "failed hook" (0, 0)
+
+(* A hook whose caller is cancelled while the hook starts leaves no watchdog
+   running. *)
+let cancelled_hook ~fs ~clock () =
+  Eio.Switch.run @@ fun sw ->
+  let tmpdir = tmpdir fs in
+  mkdir tmpdir;
+  let watcher = watcher ~sw in
+  let fds = open_fds () in
+  Fiber.first
+    (fun () ->
+      ignore (Irmin_watcher.hook watcher 0 tmpdir ignore : unit -> unit))
+    (fun () -> ());
+  Eio.Time.sleep clock 0.2;
+  check_stats watcher "no hook" (0, 0);
+  Alcotest.(check (option int)) "no file descriptor left" fds (open_fds ())
+
+(* [hook] fails, rather than blocking, when the switch of the watcher is
+   cancelled but not finished yet, including on a directory that is already
+   watched. No watchdog is left once the switch is finished. *)
+let cancelled_switch ~fs ~clock () =
+  let tmpdir = tmpdir fs in
+  mkdir tmpdir;
+  let hook watcher dir =
+    Eio.Time.with_timeout_exn clock 10. (fun () ->
+        match Irmin_watcher.hook watcher 1 dir ignore with
+        | (_ : unit -> unit) -> "hooked"
+        | exception Invalid_argument _ -> "Invalid_argument")
+  in
+  let created = ref None in
+  let results, set_results = Promise.create () in
+  Eio.Switch.run @@ fun outer ->
+  (try
+     Eio.Switch.run (fun sw ->
+         let w = watcher ~sw in
+         created := Some w;
+         let (_ : unit -> unit) = Irmin_watcher.hook w 0 tmpdir ignore in
+         Eio.Switch.fail sw Exit;
+         Fiber.fork ~sw:outer (fun () ->
+             let watched = hook w tmpdir in
+             let other = hook w Eio.Path.(tmpdir / "other") in
+             Promise.resolve set_results [ watched; other ]))
+   with Exit -> ());
+  (* Wait for the fiber, which can still be running. *)
+  Alcotest.(check (list string))
+    "hook raises Invalid_argument"
+    [ "Invalid_argument"; "Invalid_argument" ]
+    (Promise.await results);
+  check_stats (Option.get !created) "no watchdog left" (0, 0)
 
 (* Hooks on the same directory share a watchdog: they all receive the changes,
    and removing one of them does not stop the others. *)
@@ -226,6 +308,9 @@ let shared ~fs ~clock () =
   unwatch_0 ();
   write ~sw ~fs "bar" "bar";
   wait_for ~clock events_1 "bar";
+  Alcotest.(check bool)
+    "removed hook not called" false
+    (List.mem "bar" (drain events_0));
   unwatch_1 ()
 
 (* A failing callback stops neither the watcher nor the other callbacks. *)
@@ -264,14 +349,63 @@ let relative ~cwd ~clock () =
   unwatch ();
   Eio.Path.rmtree dir
 
+(* A file that cannot be read neither makes [hook] fail nor hides the other
+   changes, including those found by a full scan. *)
+let unreadable ~fs ~clock () =
+  Eio.Switch.run @@ fun sw ->
+  let tmpdir = tmpdir fs in
+  mkdir tmpdir;
+  let secret = Eio.Path.(native_exn (tmpdir / "secret")) in
+  write ~sw ~fs "secret" "secret";
+  Unix.chmod secret 0o000;
+  Fun.protect ~finally:(fun () -> Unix.chmod secret 0o600) @@ fun () ->
+  let watcher = watcher ~sw in
+  let events = Eio.Stream.create max_int in
+  let unwatch = Irmin_watcher.hook watcher 0 tmpdir (Eio.Stream.add events) in
+  (* With Inotify, creating a directory triggers a full scan. *)
+  mkdir Eio.Path.(tmpdir / "d");
+  write ~sw ~fs "top" "top";
+  wait_for ~clock events "top";
+  unwatch ()
+
+(* Renaming a sub-directory reports the files under it, at their old and new
+   paths. *)
+let renamed_dir ~fs ~clock () =
+  Eio.Switch.run @@ fun sw ->
+  write ~sw ~fs "sub/foo" "foo";
+  let watcher = watcher ~sw in
+  let events = Eio.Stream.create max_int in
+  let unwatch =
+    Irmin_watcher.hook watcher 0 (tmpdir fs) (Eio.Stream.add events)
+  in
+  (* Wait for the first scan, so that the renaming is only seen through its
+     events. *)
+  write ~sw ~fs "bar" "bar";
+  wait_for ~clock events "bar";
+  move ~fs "sub" "sub2";
+  wait_for_all ~clock events [ "sub/foo"; "sub2/foo" ];
+  unwatch ()
+
+let polling_time () =
+  Eio.Switch.run @@ fun sw ->
+  match Irmin_watcher.v ~polling_time:0. ~sw () with
+  | (_ : Irmin_watcher.t) -> Alcotest.fail "v should reject a polling time of 0"
+  | exception Invalid_argument _ -> ()
+
 let polling_tests ~sw ~fs ~cwd ~clock =
   [
     ("stats", `Quick, run ~fs (stats ~fs));
     ("unwatch", `Quick, run ~fs (unwatch ~fs ~clock));
+    ("missing directory", `Quick, run ~fs (missing_dir ~fs));
     ("cleanup", `Quick, run ~fs (cleanup ~fs));
+    ("cancelled hook", `Quick, run ~fs (cancelled_hook ~fs ~clock));
+    ("cancelled switch", `Quick, run ~fs (cancelled_switch ~fs ~clock));
     ("shared", `Quick, run ~fs (shared ~fs ~clock));
     ("failing callback", `Quick, run ~fs (failing_callback ~fs ~clock));
     ("relative", `Quick, relative ~cwd ~clock);
+    ("unreadable file", `Quick, run ~fs (unreadable ~fs ~clock));
+    ("renamed directory", `Quick, run ~fs (renamed_dir ~fs ~clock));
+    ("polling time", `Quick, polling_time);
     ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
     ("basic", `Quick, run ~fs (poll ~fs ~clock ~mkdir:true 0));
     ("100s", `Quick, run ~fs (random_polls ~sw ~fs ~clock 100));
