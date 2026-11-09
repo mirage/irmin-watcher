@@ -41,7 +41,7 @@ let poll ~fs ~clock ~mkdir:m i () =
   in
   let reset () = events := [] in
   let rec wait ?n () =
-    Eio.Time.with_timeout_exn clock 360. (fun () ->
+    Eio.Time.with_timeout_exn clock 60. (fun () ->
         match !events with
         | [] ->
             Condition.await_no_mutex cond;
@@ -141,6 +141,13 @@ let check_stats watcher msg (watchdogs, dispatches) =
     msg (watchdogs, dispatches)
     (stats.watchdogs, stats.dispatches)
 
+(* [wait_for ~clock events name] takes the elements of [events] until [name]:
+   writing a file can report it more than once. *)
+let wait_for ~clock events name =
+  Eio.Time.with_timeout_exn clock 60. (fun () ->
+      let rec loop () = if Eio.Stream.take events <> name then loop () in
+      loop ())
+
 let stats ~fs () =
   Eio.Switch.run @@ fun sw ->
   let tmpdir = tmpdir fs in
@@ -206,9 +213,6 @@ let shared ~fs ~clock () =
   let watcher = watcher ~sw in
   let events_0 = Eio.Stream.create max_int in
   let events_1 = Eio.Stream.create max_int in
-  let take events =
-    Eio.Time.with_timeout_exn clock 60. (fun () -> Eio.Stream.take events)
-  in
   let unwatch_0 =
     Irmin_watcher.hook watcher 0 tmpdir (Eio.Stream.add events_0)
   in
@@ -217,11 +221,11 @@ let shared ~fs ~clock () =
   in
   check_stats watcher "one watchdog" (1, 2);
   write ~sw ~fs "foo" "foo";
-  Alcotest.(check string) "first hook" "foo" (take events_0);
-  Alcotest.(check string) "second hook" "foo" (take events_1);
+  wait_for ~clock events_0 "foo";
+  wait_for ~clock events_1 "foo";
   unwatch_0 ();
   write ~sw ~fs "bar" "bar";
-  Alcotest.(check string) "remaining hook" "bar" (take events_1);
+  wait_for ~clock events_1 "bar";
   unwatch_1 ()
 
 (* A failing callback stops neither the watcher nor the other callbacks. *)
@@ -231,17 +235,14 @@ let failing_callback ~fs ~clock () =
   mkdir tmpdir;
   let watcher = watcher ~sw in
   let events = Eio.Stream.create max_int in
-  let take () =
-    Eio.Time.with_timeout_exn clock 60. (fun () -> Eio.Stream.take events)
-  in
   let unwatch_0 =
     Irmin_watcher.hook watcher 0 tmpdir (fun _ -> failwith "callback failure")
   in
   let unwatch_1 = Irmin_watcher.hook watcher 1 tmpdir (Eio.Stream.add events) in
   write ~sw ~fs "foo" "foo";
-  Alcotest.(check string) "first change" "foo" (take ());
+  wait_for ~clock events "foo";
   write ~sw ~fs "bar" "bar";
-  Alcotest.(check string) "second change" "bar" (take ());
+  wait_for ~clock events "bar";
   unwatch_0 ();
   unwatch_1 ()
 
