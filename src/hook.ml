@@ -202,6 +202,10 @@ let run ~ready ~wait_for_changes ~dir callback =
     in
     loop new_files ~known ~retry
   in
+  if not (Eio.Path.is_directory dir) then
+    Log.info (fun l ->
+        l "%a is not a directory: nothing is reported until it is one"
+          Eio.Path.pp dir);
   let scan = scan ~known:Paths.empty dir in
   ready ();
   loop scan.digests
