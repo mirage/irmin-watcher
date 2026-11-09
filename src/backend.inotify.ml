@@ -8,15 +8,12 @@ let src = Logs.Src.create "irw-inotify" ~doc:"Irmin watcher using Inotify"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-let mkdir d =
-  let perm = 0o0700 in
-  Eio.Path.mkdirs ~perm d
-
 (* [start_watch ~sw dir] is an inotify descriptor watching [dir]. It is closed
    when [sw] is released, which also removes the watch. *)
 let start_watch ~sw dir =
   Log.debug (fun l -> l "start_watch %a" Eio.Path.pp dir);
-  if Eio.Path.kind ~follow:false dir = `Not_found then mkdir dir;
+  (* [dir] may be created concurrently by another hook. *)
+  Eio.Path.mkdirs ~exists_ok:true ~perm:0o700 dir;
   let i = Eio_inotify.create () in
   Eio.Switch.on_release sw (fun () -> Eio_inotify.close i);
   let _ : Inotify.watch =
