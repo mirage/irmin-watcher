@@ -74,15 +74,11 @@ module Dispatch = struct
 
   let empty () : t = Hashtbl.create 10
   let clear t = Hashtbl.clear t
-
-  let stats t ~dir =
-    let nat_dir = Eio.Path.native_exn dir in
-    try List.length (Hashtbl.find t nat_dir) with Not_found -> 0
+  let find t dir = try Hashtbl.find t dir with Not_found -> []
+  let stats t ~dir = List.length (find t dir)
 
   (* call all the callbacks on the file *)
   let apply t ~dir ~file =
-    let nat_dir = Eio.Path.native_exn dir in
-    let fns = try Hashtbl.find t nat_dir with Not_found -> [] in
     Fiber.List.iter
       (fun (id, f) ->
         Log.debug (fun f -> f "callback %d" id);
@@ -96,19 +92,14 @@ module Dispatch = struct
             Log.err (fun l ->
                 l "callback %d failed on %s: %a" id file Fmt.exn_backtrace
                   (e, bt)))
-      fns
+      (find t dir)
 
-  let add t ~id ~dir fn =
-    let nat_dir = Eio.Path.native_exn dir in
-    let fns = try Hashtbl.find t nat_dir with Not_found -> [] in
-    let fns = (id, fn) :: fns in
-    Hashtbl.replace t nat_dir fns
+  let add t ~id ~dir fn = Hashtbl.replace t dir ((id, fn) :: find t dir)
 
   let remove t ~id ~dir =
-    let nat_dir = Eio.Path.native_exn dir in
-    let fns = try Hashtbl.find t nat_dir with Not_found -> [] in
-    let fns = List.filter (fun (x, _) -> x <> id) fns in
-    if fns = [] then Hashtbl.remove t nat_dir else Hashtbl.replace t nat_dir fns
+    match List.filter (fun (x, _) -> x <> id) (find t dir) with
+    | [] -> Hashtbl.remove t dir
+    | fns -> Hashtbl.replace t dir fns
 
   let length t = Hashtbl.fold (fun _ v acc -> acc + List.length v) t 0
 end
@@ -128,37 +119,27 @@ module Watchdog = struct
     Hashtbl.clear t;
     Dispatch.clear d
 
-  let watchdog t dir =
-    let nat_dir = Eio.Path.native_exn dir in
-    try Some (Hashtbl.find t nat_dir) with Not_found -> None
-
   let start { t; d } ~dir listen =
-    match watchdog t dir with
-    | Some _ -> ()
-    | None -> (
-        (* Note: multiple threads can wait here *)
-        let u = listen (fun file -> Dispatch.apply d ~dir ~file) in
-        match watchdog t dir with
-        | Some _ ->
-            (* Note: someone else won the race, cancel our own thread
-               to avoid avoid having too many wathdogs for [dir]. *)
-            u ()
-        | None ->
-            Log.debug (fun f -> f "Start watchdog for %a" Eio.Path.pp dir);
-            let nat_dir = Eio.Path.native_exn dir in
-            Hashtbl.add t nat_dir u)
+    if not (Hashtbl.mem t dir) then
+      (* Note: multiple threads can wait here *)
+      let u = listen (fun file -> Dispatch.apply d ~dir ~file) in
+      if Hashtbl.mem t dir then
+        (* Note: someone else won the race, cancel our own thread
+           to avoid avoid having too many wathdogs for [dir]. *)
+        u ()
+      else (
+        Log.debug (fun f -> f "Start watchdog for %s" dir);
+        Hashtbl.add t dir u)
 
   let stop { t; d } ~dir =
-    match watchdog t dir with
+    match Hashtbl.find_opt t dir with
     | None -> ()
     | Some stop ->
         if Dispatch.stats d ~dir <> 0 then
-          Log.debug (fun f ->
-              f "Active callbacks are registered for %a" Eio.Path.pp dir)
+          Log.debug (fun f -> f "Active callbacks are registered for %s" dir)
         else (
-          Log.debug (fun f -> f "Stop watchdog for %a" Eio.Path.pp dir);
-          let nat_dir = Eio.Path.native_exn dir in
-          Hashtbl.remove t nat_dir;
+          Log.debug (fun f -> f "Stop watchdog for %s" dir);
+          Hashtbl.remove t dir;
           stop ())
 end
 
@@ -172,10 +153,11 @@ let create ~sw listen =
   let watchdog = Watchdog.empty () in
   (* No watchdog runs once [sw] is finished. *)
   Switch.on_release sw (fun () -> Watchdog.clear watchdog);
-  let listen id dir fn =
+  let listen id path fn =
     (* The watchdog of [dir] may still be registered, but stopped with
        [sw]. *)
     if Option.is_some (Switch.get_error sw) then switch_cancelled ();
+    let dir = Eio.Path.native_exn path in
     let d = Watchdog.dispatch watchdog in
     let active = ref true in
     (* [fn] is not called once the hook is removed, even for a change found
@@ -187,7 +169,7 @@ let create ~sw listen =
         Dispatch.remove d ~id ~dir;
         Watchdog.stop watchdog ~dir)
     in
-    (try Watchdog.start watchdog ~dir (listen dir)
+    (try Watchdog.start watchdog ~dir (listen path)
      with e ->
        let bt = Printexc.get_raw_backtrace () in
        unlisten ();

@@ -25,7 +25,8 @@ module Digests : sig
   (** [files t] is the list of files whose digest is stored in [t]. *)
 end
 
-(** Dispatch listening functions. *)
+(** Dispatch listening functions. Directories are named by their native path
+    ({!Eio.Path.native_exn}). *)
 module Dispatch : sig
   type t
   (** The type for callback dispatches. *)
@@ -37,20 +38,19 @@ module Dispatch : sig
   (** [clear t] clears the contents of the dispatch table [t]. All previous
       callbacks are discarded. *)
 
-  val stats : t -> dir:Eio.Fs.dir_ty Eio.Path.t -> int
+  val stats : t -> dir:string -> int
   (** [stats t ~dir] is the number of active callbacks registered for the
       directory [dir]. *)
 
-  val apply : t -> dir:Eio.Fs.dir_ty Eio.Path.t -> file:string -> unit
+  val apply : t -> dir:string -> file:string -> unit
   (** [apply t ~dir ~file] calls [f file] for every callback [f] registered for
       the directory [dir]. *)
 
-  val add :
-    t -> id:int -> dir:Eio.Fs.dir_ty Eio.Path.t -> (string -> unit) -> unit
+  val add : t -> id:int -> dir:string -> (string -> unit) -> unit
   (** [add t ~id ~dir f] adds a new callback [f] to the directory [dir], using
       the unique identifier [id]. *)
 
-  val remove : t -> id:int -> dir:Eio.Fs.dir_ty Eio.Path.t -> unit
+  val remove : t -> id:int -> dir:string -> unit
   (** [remove t ~id ~dir] removes the callback with ID [id] on the directory
       [dir]. *)
 
@@ -76,11 +76,11 @@ module Watchdog : sig
   val clear : t -> unit
   (** [clear ()] stops all the currently active watchdogs. *)
 
-  val start : t -> dir:Eio.Fs.dir_ty Eio.Path.t -> hook -> unit
+  val start : t -> dir:string -> hook -> unit
   (** [start t ~dir h] adds a new callback hook on the directory [dir], starting
       a new watchdog if needed otherwise re-using the previous one. *)
 
-  val stop : t -> dir:Eio.Fs.dir_ty Eio.Path.t -> unit
+  val stop : t -> dir:string -> unit
   (** [stop t ~dir] stops the filesystem watchdog on directory [dir], if there
       is one and no callback is registered for [dir] any more. *)
 
