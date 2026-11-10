@@ -462,6 +462,33 @@ let renamed_dir ~fs ~clock () =
   wait_for_all ~clock events [ "sub/foo"; "sub2/foo" ];
   unwatch ()
 
+(* Full scans do not read again the files that have not changed, but they read
+   a file whose size and modification time stay the same. *)
+let unchanged_status ~fs ~clock () =
+  Eio.Switch.run @@ fun sw ->
+  let tmpdir = tmpdir fs in
+  let foo = Eio.Path.(native_exn (tmpdir / "sub" / "foo")) in
+  (* An integer time is stored exactly. *)
+  let set_mtime () = Unix.utimes foo 1e9 1e9 in
+  write ~sw ~fs "sub/foo" "aaa";
+  set_mtime ();
+  let watcher = watcher ~sw in
+  let events = Eio.Stream.create max_int in
+  let unwatch = Irmin_watcher.hook watcher 0 tmpdir (Eio.Stream.add events) in
+  (* A file is not read again if it changed shortly before it was read. Wait
+     long enough, then for a full scan. With Inotify, creating a directory
+     triggers a full scan, and the files of sub-directories are only read by
+     full scans. *)
+  Eio.Time.sleep clock 2.5;
+  mkdir Eio.Path.(tmpdir / "d1");
+  write ~sw ~fs "top" "top";
+  wait_for ~clock events "top";
+  write ~sw ~fs "sub/foo" "bbb";
+  set_mtime ();
+  mkdir Eio.Path.(tmpdir / "d2");
+  wait_for ~clock events "sub/foo";
+  unwatch ()
+
 let polling_time () =
   Eio.Switch.run @@ fun sw ->
   match Irmin_watcher.v ~polling_time:0. ~sw () with
@@ -483,6 +510,7 @@ let polling_tests ~sw ~fs ~cwd ~clock =
     ("pending rescan", `Quick, run ~fs (pending_rescan ~fs ~clock));
     ("symbolic links", `Quick, run ~fs (symlinks ~fs ~clock));
     ("renamed directory", `Quick, run ~fs (renamed_dir ~fs ~clock));
+    ("unchanged status", `Quick, run ~fs (unchanged_status ~fs ~clock));
     ("polling time", `Quick, polling_time);
     ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
     ("basic", `Quick, run ~fs (poll ~fs ~clock ~mkdir:true 0));

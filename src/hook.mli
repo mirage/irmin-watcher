@@ -22,7 +22,9 @@ val run :
 (** [run ~ready ~wait_for_changes ~dir f] reads the files of the directory
     [dir], calls [ready ()], then calls [f] on every file that changes, with its
     path relative to [dir]. It calls [wait_for_changes] to wait for the next
-    filesystem update, which can be a list of files or [`Unknown]. The files and
+    filesystem update, which can be a list of files or [`Unknown]. [`Unknown]
+    reads again only the files whose status (size, times, inode) changed, and
+    the files that changed shortly before they were read. The files and
     directories that cannot be read are logged, keep their previous state, and
     are read again later, after a delay growing up to a minute. It never
     returns. *)

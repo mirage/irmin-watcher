@@ -34,6 +34,8 @@
   read.
 - Digest the files larger than 1 MB in a system thread, so that the other
   fibers keep running.
+- Full scans no longer read again the files whose status (size, times, inode)
+  has not changed, except on Windows.
 - With Inotify, rescan the directory when a sub-directory changes or when the
   event queue overflows.
 - With Inotify, read a file changed several times in a row only once.
