@@ -14,12 +14,10 @@ let mkdir d =
   let perm = 0o0700 in
   Eio.Path.mkdirs ~exists_ok:true ~perm d
 
-let write ~sw ~fs f d =
+let write ~fs f d =
   let f = Eio.Path.(tmpdir fs / f) in
   mkdir (fst @@ Option.get @@ Eio.Path.split f);
-  let oc = Eio.Path.open_out ~sw ~create:(`Or_truncate 0o0700) f in
-  Eio.Flow.copy_string d oc;
-  Eio.Flow.close oc
+  Eio.Path.save ~create:(`Or_truncate 0o600) f d
 
 let move ~fs a b = Eio.Path.(rename (tmpdir fs / a) (tmpdir fs / b))
 
@@ -72,10 +70,7 @@ let poll ~fs ~clock ~mkdir:m i () =
                 Hashtbl.replace expected event false;
                 n - 1
             | Some false -> n
-            | None ->
-                Fmt.pr "event: %s@." event;
-                Alcotest.check Alcotest.reject s () ();
-                assert false)
+            | None -> Alcotest.failf "%s: unexpected event %s" s event)
           n events
       in
       if n > 0 then loop n
@@ -89,7 +84,7 @@ let poll ~fs ~clock ~mkdir:m i () =
   in
 
   Hashtbl.replace expected "foo" true;
-  write ~sw ~fs "foo" ("foo" ^ string_of_int i);
+  write ~fs "foo" ("foo" ^ string_of_int i);
   wait_and_check_events "update foo";
 
   Hashtbl.replace expected "foo" true;
@@ -97,11 +92,11 @@ let poll ~fs ~clock ~mkdir:m i () =
   wait_and_check_events "remove foo";
 
   Hashtbl.replace expected "foo" true;
-  write ~sw ~fs "foo" ("foo" ^ string_of_int i);
+  write ~fs "foo" ("foo" ^ string_of_int i);
   wait_and_check_events "create foo";
 
   Hashtbl.replace expected "bar" true;
-  write ~sw ~fs "bar" ("bar" ^ string_of_int i);
+  write ~fs "bar" ("bar" ^ string_of_int i);
   wait_and_check_events "create bar";
 
   Hashtbl.replace expected "bar" true;
@@ -120,11 +115,11 @@ let random_path n =
   let rec aux = function 0 -> [] | n -> random_filename () :: aux (n - 1) in
   String.concat "/" (aux (n + 1))
 
-let prepare_fs ~sw ~fs:eio_fs n =
+let prepare_fs ~fs:eio_fs n =
   let fs = Array.init n (fun i -> (random_path 4, string_of_int i)) in
-  Array.iter (fun (k, v) -> write ~sw ~fs:eio_fs k v) fs
+  Array.iter (fun (k, v) -> write ~fs:eio_fs k v) fs
 
-let random_polls ~sw ~fs ~clock n () =
+let random_polls ~fs ~clock n () =
   mkdir (tmpdir fs);
   let rec aux = function
     | 0 -> ()
@@ -132,7 +127,7 @@ let random_polls ~sw ~fs ~clock n () =
         poll ~fs ~clock ~mkdir:false i ();
         aux (i - 1)
   in
-  prepare_fs ~sw ~fs n;
+  prepare_fs ~fs n;
   match Irmin_watcher.mode with `Polling -> aux 10 | _ -> aux 100
 
 let check_stats watcher msg (watchdogs, dispatches) =
@@ -197,7 +192,7 @@ let unwatch ~fs ~clock () =
       (fun () -> Irmin_watcher.hook watcher 1 tmpdir ignore)
   in
   check_stats watcher "one watchdog" (1, 2);
-  write ~sw ~fs "foo" "foo";
+  write ~fs "foo" "foo";
   wait_for ~clock events "foo";
   unwatch_0 ();
   unwatch_1 ();
@@ -305,11 +300,11 @@ let shared ~fs ~clock () =
     Irmin_watcher.hook watcher 1 tmpdir (Eio.Stream.add events_1)
   in
   check_stats watcher "one watchdog" (1, 2);
-  write ~sw ~fs "foo" "foo";
+  write ~fs "foo" "foo";
   wait_for ~clock events_0 "foo";
   wait_for ~clock events_1 "foo";
   unwatch_0 ();
-  write ~sw ~fs "bar" "bar";
+  write ~fs "bar" "bar";
   wait_for ~clock events_1 "bar";
   Alcotest.(check bool)
     "removed hook not called" false
@@ -327,9 +322,9 @@ let failing_callback ~fs ~clock () =
     Irmin_watcher.hook watcher 0 tmpdir (fun _ -> failwith "callback failure")
   in
   let unwatch_1 = Irmin_watcher.hook watcher 1 tmpdir (Eio.Stream.add events) in
-  write ~sw ~fs "foo" "foo";
+  write ~fs "foo" "foo";
   wait_for ~clock events "foo";
-  write ~sw ~fs "bar" "bar";
+  write ~fs "bar" "bar";
   wait_for ~clock events "bar";
   unwatch_0 ();
   unwatch_1 ()
@@ -359,7 +354,7 @@ let unreadable ~fs ~clock () =
   let tmpdir = tmpdir fs in
   mkdir tmpdir;
   let secret = Eio.Path.(native_exn (tmpdir / "secret")) in
-  write ~sw ~fs "secret" "secret";
+  write ~fs "secret" "secret";
   Unix.chmod secret 0o000;
   Fun.protect ~finally:(fun () -> Unix.chmod secret 0o600) @@ fun () ->
   let watcher = watcher ~sw in
@@ -367,7 +362,7 @@ let unreadable ~fs ~clock () =
   let unwatch = Irmin_watcher.hook watcher 0 tmpdir (Eio.Stream.add events) in
   (* With Inotify, creating a directory triggers a full scan. *)
   mkdir Eio.Path.(tmpdir / "d");
-  write ~sw ~fs "top" "top";
+  write ~fs "top" "top";
   wait_for ~clock events "top";
   unwatch ()
 
@@ -378,7 +373,7 @@ let pending_rescan ~fs ~clock () =
   let tmpdir = tmpdir fs in
   mkdir tmpdir;
   let secret = Eio.Path.(native_exn (tmpdir / "secret")) in
-  write ~sw ~fs "secret" "A";
+  write ~fs "secret" "A";
   Fun.protect ~finally:(fun () -> Unix.chmod secret 0o600) @@ fun () ->
   let watcher = watcher ~sw in
   let events = Eio.Stream.create max_int in
@@ -386,7 +381,7 @@ let pending_rescan ~fs ~clock () =
   Unix.chmod secret 0o200;
   Out_channel.with_open_gen [ Open_wronly; Open_trunc ] 0o200 secret (fun oc ->
       Out_channel.output_string oc "B");
-  write ~sw ~fs "top" "top";
+  write ~fs "top" "top";
   (* Wait for [top], noting whether [secret] was read anyway (as root). *)
   let seen_secret = ref false in
   Eio.Time.with_timeout_exn clock 60. (fun () ->
@@ -410,8 +405,8 @@ let symlinks ~fs ~clock () =
   Eio.Switch.run @@ fun sw ->
   let tmpdir = tmpdir fs in
   let dir = Eio.Path.(tmpdir / "w") in
-  write ~sw ~fs "w/sub/foo" "foo";
-  write ~sw ~fs "out/foo" "foo";
+  write ~fs "w/sub/foo" "foo";
+  write ~fs "out/foo" "foo";
   let link target name =
     Unix.symlink target Eio.Path.(native_exn (tmpdir / name))
   in
@@ -425,11 +420,11 @@ let symlinks ~fs ~clock () =
     Eio.Time.with_timeout_exn clock 10. (fun () ->
         Irmin_watcher.hook watcher 0 dir (Eio.Stream.add events))
   in
-  write ~sw ~fs "out/bar" "bar";
+  write ~fs "out/bar" "bar";
   link "../out/foo" "w/file";
   (* With Inotify, creating a directory triggers a full scan. *)
   mkdir Eio.Path.(dir / "d");
-  write ~sw ~fs "w/top" "top";
+  write ~fs "w/top" "top";
   (* Every event until both [file] and [top] are reported. *)
   let seen =
     Eio.Time.with_timeout_exn clock 60. (fun () ->
@@ -448,7 +443,7 @@ let symlinks ~fs ~clock () =
    paths. *)
 let renamed_dir ~fs ~clock () =
   Eio.Switch.run @@ fun sw ->
-  write ~sw ~fs "sub/foo" "foo";
+  write ~fs "sub/foo" "foo";
   let watcher = watcher ~sw in
   let events = Eio.Stream.create max_int in
   let unwatch =
@@ -456,7 +451,7 @@ let renamed_dir ~fs ~clock () =
   in
   (* Wait for the first scan, so that the renaming is only seen through its
      events. *)
-  write ~sw ~fs "bar" "bar";
+  write ~fs "bar" "bar";
   wait_for ~clock events "bar";
   move ~fs "sub" "sub2";
   wait_for_all ~clock events [ "sub/foo"; "sub2/foo" ];
@@ -470,7 +465,7 @@ let unchanged_status ~fs ~clock () =
   let foo = Eio.Path.(native_exn (tmpdir / "sub" / "foo")) in
   (* An integer time is stored exactly. *)
   let set_mtime () = Unix.utimes foo 1e9 1e9 in
-  write ~sw ~fs "sub/foo" "aaa";
+  write ~fs "sub/foo" "aaa";
   set_mtime ();
   let watcher = watcher ~sw in
   let events = Eio.Stream.create max_int in
@@ -481,9 +476,9 @@ let unchanged_status ~fs ~clock () =
      full scans. *)
   Eio.Time.sleep clock 2.5;
   mkdir Eio.Path.(tmpdir / "d1");
-  write ~sw ~fs "top" "top";
+  write ~fs "top" "top";
   wait_for ~clock events "top";
-  write ~sw ~fs "sub/foo" "bbb";
+  write ~fs "sub/foo" "bbb";
   set_mtime ();
   mkdir Eio.Path.(tmpdir / "d2");
   wait_for ~clock events "sub/foo";
@@ -495,7 +490,7 @@ let polling_time () =
   | (_ : Irmin_watcher.t) -> Alcotest.fail "v should reject a polling time of 0"
   | exception Invalid_argument _ -> ()
 
-let polling_tests ~sw ~fs ~cwd ~clock =
+let polling_tests ~fs ~cwd ~clock =
   [
     ("stats", `Quick, run ~fs (stats ~fs));
     ("unwatch", `Quick, run ~fs (unwatch ~fs ~clock));
@@ -514,8 +509,8 @@ let polling_tests ~sw ~fs ~cwd ~clock =
     ("polling time", `Quick, polling_time);
     ("enoent", `Quick, run ~fs (poll ~fs ~clock ~mkdir:false 0));
     ("basic", `Quick, run ~fs (poll ~fs ~clock ~mkdir:true 0));
-    ("100s", `Quick, run ~fs (random_polls ~sw ~fs ~clock 100));
-    ("1000s", `Slow, run ~fs (random_polls ~sw ~fs ~clock 1000));
+    ("100s", `Quick, run ~fs (random_polls ~fs ~clock 100));
+    ("1000s", `Slow, run ~fs (random_polls ~fs ~clock 1000));
   ]
 
 let mode =
@@ -524,7 +519,7 @@ let mode =
   | `Inotify -> "inotify"
   | `Polling -> "polling"
 
-let tests ~sw ~fs ~cwd ~clock = [ (mode, polling_tests ~sw ~fs ~cwd ~clock) ]
+let tests ~fs ~cwd ~clock = [ (mode, polling_tests ~fs ~cwd ~clock) ]
 
 let reporter () =
   let pad n x =
@@ -552,9 +547,7 @@ let reporter () =
 
 let () =
   Eio_main.run @@ fun env ->
-  Eio.Switch.run @@ fun sw ->
   Lwt_eio.with_event_loop ~clock:env#clock @@ fun _ ->
   Logs.set_level (Some Logs.Debug);
   Logs.set_reporter (reporter ());
-  Alcotest.run "irmin-watch"
-    (tests ~sw ~fs:env#fs ~cwd:env#cwd ~clock:env#clock)
+  Alcotest.run "irmin-watch" (tests ~fs:env#fs ~cwd:env#cwd ~clock:env#clock)
