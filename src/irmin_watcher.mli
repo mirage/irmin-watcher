@@ -36,8 +36,9 @@ val hook :
   t -> int -> Eio.Fs.dir_ty Eio.Path.t -> (string -> unit) -> unit -> unit
 (** [hook t id p f] calls [f] everytime a file under [p] is created, modified or
     removed, and returns a function that removes the hook. [f] receives the path
-    of the file relative to [p], using ["/"] as separator. [id] is a unique
-    identifier distinguishing the hooks registered on the same path.
+    of the file relative to [p], using ["/"] as separator. [id] names the hook
+    in the logs; removing a hook does not remove the other hooks with the same
+    [id].
 
     [hook] returns once [p] has been read: later changes are reported. It raises
     the errors met while starting to watch [p]. The files and directories under

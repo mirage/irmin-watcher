@@ -70,17 +70,24 @@ module Digests = struct
 end
 
 module Dispatch = struct
-  type t = (string, (int * (string -> unit)) list) Hashtbl.t
+  (* [key] is unique to each callback, while several callbacks can have the
+     same [id]. *)
+  type callback = { key : int; id : int; f : string -> unit }
 
-  let empty () : t = Hashtbl.create 10
-  let clear t = Hashtbl.clear t
-  let find t dir = try Hashtbl.find t dir with Not_found -> []
+  type t = {
+    callbacks : (string, callback list) Hashtbl.t;
+    mutable next_key : int;
+  }
+
+  let empty () = { callbacks = Hashtbl.create 10; next_key = 0 }
+  let clear t = Hashtbl.clear t.callbacks
+  let find t dir = try Hashtbl.find t.callbacks dir with Not_found -> []
   let stats t ~dir = List.length (find t dir)
 
   (* call all the callbacks on the file *)
   let apply t ~dir ~file =
     Fiber.List.iter
-      (fun (id, f) ->
+      (fun { id; f; _ } ->
         Log.debug (fun f -> f "callback %d" id);
         (* A failing callback must not stop the watchdog, which other
            callbacks share. *)
@@ -94,14 +101,16 @@ module Dispatch = struct
                   (e, bt)))
       (find t dir)
 
-  let add t ~id ~dir fn = Hashtbl.replace t dir ((id, fn) :: find t dir)
+  let add t ~id ~dir f =
+    let key = t.next_key in
+    t.next_key <- key + 1;
+    Hashtbl.replace t.callbacks dir ({ key; id; f } :: find t dir);
+    fun () ->
+      match List.filter (fun c -> c.key <> key) (find t dir) with
+      | [] -> Hashtbl.remove t.callbacks dir
+      | callbacks -> Hashtbl.replace t.callbacks dir callbacks
 
-  let remove t ~id ~dir =
-    match List.filter (fun (x, _) -> x <> id) (find t dir) with
-    | [] -> Hashtbl.remove t dir
-    | fns -> Hashtbl.replace t dir fns
-
-  let length t = Hashtbl.fold (fun _ v acc -> acc + List.length v) t 0
+  let length t = Hashtbl.fold (fun _ v acc -> acc + List.length v) t.callbacks 0
 end
 
 module Watchdog = struct
@@ -162,11 +171,13 @@ let create ~sw listen =
     let active = ref true in
     (* [fn] is not called once the hook is removed, even for a change found
        earlier. *)
-    Dispatch.add d ~id ~dir (fun file -> if !active then fn file);
+    let remove =
+      Dispatch.add d ~id ~dir (fun file -> if !active then fn file)
+    in
     let unlisten () =
       if !active then (
         active := false;
-        Dispatch.remove d ~id ~dir;
+        remove ();
         Watchdog.stop watchdog ~dir)
     in
     (try Watchdog.start watchdog ~dir (listen path)

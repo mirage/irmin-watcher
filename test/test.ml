@@ -217,8 +217,8 @@ let missing_dir ~fs () =
   unwatch_0 ();
   unwatch_1 ()
 
-(* Removing a hook twice does not remove a later hook with the same id, and a
-   hook that fails to start leaves nothing behind. *)
+(* Removing a hook, even twice, does not remove the other hooks with the same
+   id, and a hook that fails to start leaves nothing behind. *)
 let cleanup ~fs () =
   let tmpdir = tmpdir fs in
   mkdir tmpdir;
@@ -229,7 +229,10 @@ let cleanup ~fs () =
       let unwatch_1 = Irmin_watcher.hook watcher 0 tmpdir ignore in
       unwatch_0 ();
       check_stats watcher "hook removed twice" (1, 1);
-      unwatch_1 ());
+      let unwatch_2 = Irmin_watcher.hook watcher 0 tmpdir ignore in
+      unwatch_1 ();
+      check_stats watcher "other hook with the same id" (1, 1);
+      unwatch_2 ());
   let watcher = Eio.Switch.run (fun sw -> watcher ~sw) in
   (match Irmin_watcher.hook watcher 0 tmpdir ignore with
   | (_ : unit -> unit) ->

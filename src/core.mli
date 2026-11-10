@@ -46,13 +46,10 @@ module Dispatch : sig
   (** [apply t ~dir ~file] calls [f file] for every callback [f] registered for
       the directory [dir]. *)
 
-  val add : t -> id:int -> dir:string -> (string -> unit) -> unit
-  (** [add t ~id ~dir f] adds a new callback [f] to the directory [dir], using
-      the unique identifier [id]. *)
-
-  val remove : t -> id:int -> dir:string -> unit
-  (** [remove t ~id ~dir] removes the callback with ID [id] on the directory
-      [dir]. *)
+  val add : t -> id:int -> dir:string -> (string -> unit) -> unit -> unit
+  (** [add t ~id ~dir f] adds a new callback [f] to the directory [dir], and
+      returns a function that removes it. [id] names [f] in the logs: several
+      callbacks can have the same [id]. *)
 
   val length : t -> int
   (** [length t] is [t]'s length. *)

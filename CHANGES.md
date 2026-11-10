@@ -21,7 +21,8 @@
     reached through two different paths gets two watchdogs.
   - Exceptions raised by callbacks are logged.
   - The FSevents backend (macOS) needs a running `Lwt_eio` event loop.
-- Removing a hook twice no longer removes another hook with the same id.
+- Removing a hook, even twice, no longer removes the other hooks with the
+  same id.
 - A callback is no longer called once its hook is removed.
 - A directory removed while it is scanned no longer stops the watcher.
 - Files that cannot be read keep their previous state and are read again
