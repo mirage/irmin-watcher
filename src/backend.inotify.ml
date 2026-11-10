@@ -59,14 +59,17 @@ let v ~sw ~polling_time:_ =
           | Some _ -> drain ()
           | None -> ()
         in
-        let wait_for_changes () =
-          match Eio.Stream.take events with
-          | `File _ as e -> e
-          | `Unknown ->
-              (* A full scan covers the changes queued so far. *)
+        (* Merge the changes queued so far: a full scan covers all of them,
+           and a file changed several times is read once. *)
+        let rec merge files = function
+          | Some `Unknown ->
               drain ();
               `Unknown
+          | Some (`File file) ->
+              merge (file :: files) (Eio.Stream.take_nonblocking events)
+          | None -> `Files (List.sort_uniq String.compare files)
         in
+        let wait_for_changes () = merge [] (Some (Eio.Stream.take events)) in
         Eio.Fiber.both
           (fun () -> listen dir i (Eio.Stream.add events))
           (fun () -> Hook.run ~ready ~wait_for_changes ~dir f))

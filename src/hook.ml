@@ -136,7 +136,16 @@ let merge ~previous { digests; failed } =
     in
     Digests.union digests (Digests.filter (fun (rel, _) -> under rel) previous)
 
-type event = [ `Unknown | `File of string ]
+type event = [ `Unknown | `Files of string list ]
+
+(* [remove_file rel files] is [files] without the digest of the file [rel],
+   which has at most one. *)
+let remove_file rel files =
+  match
+    Digests.find_first_opt (fun (x, _) -> String.compare x rel >= 0) files
+  with
+  | Some ((x, _) as elt) when String.equal x rel -> Digests.remove elt files
+  | _ -> files
 
 (* [update ~known dir files event] is the new state of [dir] after [event],
    whether all the files concerned could be read, and the paths that are known
@@ -146,14 +155,19 @@ let update ~known dir files (event : event) =
   | `Unknown ->
       let scan = scan ~known dir in
       (merge ~previous:files scan, scan.failed = [], Paths.of_list scan.failed)
-  | `File rel -> (
-      let others = Digests.filter (fun (x, _) -> x <> rel) files in
-      match read_file dir rel with
-      | None -> (others, true, Paths.remove rel known)
-      | Some d -> (Digests.add (rel, d) others, true, Paths.remove rel known)
-      | exception ((Eio.Io _ | Sys_error _) as ex) ->
-          log_failure ~known dir rel ex;
-          (files, false, Paths.add rel known))
+  | `Files rels ->
+      List.fold_left
+        (fun (files, complete, known) rel ->
+          match read_file dir rel with
+          | None -> (remove_file rel files, complete, Paths.remove rel known)
+          | Some d ->
+              ( Digests.add (rel, d) (remove_file rel files),
+                complete,
+                Paths.remove rel known )
+          | exception ((Eio.Io _ | Sys_error _) as ex) ->
+              log_failure ~known dir rel ex;
+              (files, false, Paths.add rel known))
+        (files, true, known) rels
 
 let report n ~callback dir files new_files =
   Log.debug (fun l ->
@@ -197,8 +211,8 @@ let run ~ready ~wait_for_changes ~dir callback =
     let retry =
       match (event, complete, retry) with
       | `Unknown, true, _ -> None
-      | `Unknown, false, _ | `File _, false, None -> next_retry retry
-      | `File _, _, _ -> retry
+      | `Unknown, false, _ | `Files _, false, None -> next_retry retry
+      | `Files _, _, _ -> retry
     in
     loop new_files ~known ~retry
   in

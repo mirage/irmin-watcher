@@ -8,10 +8,10 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
-type event = [ `Unknown | `File of string ]
-(** The type for change event. [`File f] is a change of the file [f], given by
-    its path relative to the watched directory. [`Unknown] is a change anywhere
-    in the watched directory. *)
+type event = [ `Unknown | `Files of string list ]
+(** The type for change event. [`Files fs] is a change of the files [fs], given
+    by their path relative to the watched directory. [`Unknown] is a change
+    anywhere in the watched directory. *)
 
 val run :
   ready:(unit -> unit) ->
@@ -22,7 +22,7 @@ val run :
 (** [run ~ready ~wait_for_changes ~dir f] reads the files of the directory
     [dir], calls [ready ()], then calls [f] on every file that changes, with its
     path relative to [dir]. It calls [wait_for_changes] to wait for the next
-    filesystem update, which can be a single file or [`Unknown]. The files and
+    filesystem update, which can be a list of files or [`Unknown]. The files and
     directories that cannot be read are logged, keep their previous state, and
     are read again later, after a delay growing up to a minute. It never
     returns. *)

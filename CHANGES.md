@@ -36,6 +36,7 @@
   fibers keep running.
 - With Inotify, rescan the directory when a sub-directory changes or when the
   event queue overflows.
+- With Inotify, read a file changed several times in a row only once.
 - Require OCaml 5.2 and Eio 1.6 or later.
 - Depend on `lwt`, `cf-lwt` and `fsevents-lwt` only on macOS.
 
