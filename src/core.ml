@@ -130,11 +130,11 @@ module Watchdog = struct
 
   let start { t; d } ~dir listen =
     if not (Hashtbl.mem t dir) then
-      (* Note: multiple threads can wait here *)
+      (* Note: several fibers can wait here *)
       let u = listen (fun file -> Dispatch.apply d ~dir ~file) in
       if Hashtbl.mem t dir then
-        (* Note: someone else won the race, cancel our own thread
-           to avoid avoid having too many wathdogs for [dir]. *)
+        (* Note: someone else won the race, stop our own watchdog
+           to avoid having too many watchdogs for [dir]. *)
         u ()
       else (
         Log.debug (fun f -> f "Start watchdog for %s" dir);

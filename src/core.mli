@@ -32,7 +32,7 @@ module Dispatch : sig
   (** The type for callback dispatches. *)
 
   val empty : unit -> t
-  (** [create ()] is the empty dispatch table. *)
+  (** [empty ()] is the empty dispatch table. *)
 
   val clear : t -> unit
   (** [clear t] clears the contents of the dispatch table [t]. All previous
@@ -62,7 +62,7 @@ module Watchdog : sig
   (** The type for filesystem watchdogs. *)
 
   val dispatch : t -> Dispatch.t
-  (** [dispath t] is the table of [t]'s callback dispatch. *)
+  (** [dispatch t] is the callback dispatch table of [t]. *)
 
   type hook = (string -> unit) -> unit -> unit
   (** The type for watchdog hook. *)
@@ -71,7 +71,7 @@ module Watchdog : sig
   (** [empty ()] is the empty watchdog, monitoring no directory. *)
 
   val clear : t -> unit
-  (** [clear ()] stops all the currently active watchdogs. *)
+  (** [clear t] stops all the currently active watchdogs. *)
 
   val start : t -> dir:string -> hook -> unit
   (** [start t ~dir h] adds a new callback hook on the directory [dir], starting
@@ -82,7 +82,7 @@ module Watchdog : sig
       is one and no callback is registered for [dir] any more. *)
 
   val length : t -> int
-  (** [length t] is the number of watchdog threads. *)
+  (** [length t] is the number of running watchdogs. *)
 end
 
 type hook = int -> Eio.Fs.dir_ty Eio.Path.t -> (string -> unit) -> unit -> unit
