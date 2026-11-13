@@ -11,69 +11,102 @@ let src = Logs.Src.create "irw-fsevents" ~doc:"Irmin watcher using FSevents"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let create_flags = Fsevents.CreateFlags.detailed_interactive
-
 let run_loop_mode = Cf.RunLoop.Mode.Default
 
-let start_runloop dir =
+(* Long enough for the run loop to run until it is stopped. *)
+let forever = 1e9
+
+let start_runloop ~sw dir =
+  let dir = Eio.Path.native_exn dir in
+  (* FSEvents needs absolute paths. *)
+  let dir =
+    if Filename.is_relative dir then Filename.concat (Sys.getcwd ()) dir
+    else dir
+  in
   Log.debug (fun l -> l "start_runloop %s" dir);
   let watcher = Fsevents_lwt.create 0. create_flags [ dir ] in
   let stream = Fsevents_lwt.stream watcher in
   let event_stream = Fsevents_lwt.event_stream watcher in
-  Cf_lwt.RunLoop.run_thread (fun runloop ->
-      Fsevents.schedule_with_run_loop event_stream runloop run_loop_mode;
-      if not (Fsevents.start event_stream) then
-        prerr_endline "failed to start FSEvents stream")
-  >|= fun _scheduler ->
-  (* FIXME: should probably do something with the scheduler *)
-  let stop_scheduler () =
-    Fsevents_lwt.flush watcher >|= fun () ->
-    Fsevents_lwt.stop watcher;
+  (* The run loop thread only records whether the stream started: the result
+     is read on the Eio side. *)
+  let start = Atomic.make false in
+  (* The stream is freed once its run loop has exited, when no callback can use
+     it any more. Freeing it needs the Lwt event loop: without it, the stream
+     leaks rather than blocking. *)
+  let free (_ : Cf.RunLoop.RunResult.t) =
     Fsevents_lwt.invalidate watcher;
-    Fsevents_lwt.release watcher
+    Fsevents_lwt.release watcher;
+    Lwt.return_unit
   in
-  (stream, stop_scheduler)
+  let scheduler =
+    Cf_lwt.RunLoop.run_thread_in_mode ~seconds:forever run_loop_mode
+      (fun runloop ->
+        Fsevents.schedule_with_run_loop event_stream runloop run_loop_mode;
+        Atomic.set start (Fsevents.start event_stream))
+      free
+  in
+  let stop runloop =
+    Fsevents_lwt.stop watcher;
+    Cf.RunLoop.stop runloop
+  in
+  match Lwt_eio.Promise.await_lwt scheduler with
+  | runloop ->
+      if not (Atomic.get start) then
+        (* Leave the run loop alone: with no started stream, it may have exited
+           and been freed already. *)
+        Fmt.failwith "Irmin_watcher: cannot start the FSEvents stream for %s"
+          dir;
+      Eio.Switch.on_release sw (fun () -> stop runloop);
+      stream
+  | exception (Eio.Cancel.Cancelled _ as e) ->
+      let bt = Printexc.get_raw_backtrace () in
+      (* The run loop thread is still starting the stream: stop it once the
+         thread is done, if it started. *)
+      Lwt.on_success scheduler (fun runloop ->
+          if Atomic.get start then stop runloop);
+      Printexc.raise_with_backtrace e bt
 
-let listen stream fn =
+let listen dir stream fn =
   let path_of_event { Fsevents_lwt.path; _ } = path in
   let iter () =
     Lwt_stream.iter_s
       (fun e ->
-        let path = path_of_event e in
-        Log.debug (fun l -> l "fsevents: %s" path);
+        let path = Eio.Path.(dir / path_of_event e) in
+        Log.debug (fun l -> l "fsevents: %a" Eio.Path.pp path);
         fn @@ path)
       stream
   in
-  Core.stoppable iter
+  Lwt_eio.run_lwt iter
 
 (* Note: we use FSevents to detect any change, and we re-read the full
    tree on every change (so very similar to active polling, but
    blocking on incoming FSevents instead of sleeping). We could
    probably do better, but at the moment it is more robust to do so,
    to avoid possible duplicated events. *)
-let v =
+let v ~sw ~polling_time:_ =
   let listen dir f =
     Log.info (fun l -> l "FSevents mode");
-    let events = ref [] in
-    let cond = Lwt_condition.create () in
-    start_runloop dir >>= fun (stream, stop_runloop) ->
-    let rec wait_for_changes () =
-      match List.rev !events with
-      | [] -> Lwt_condition.wait cond >>= wait_for_changes
-      | h :: t ->
-          events := List.rev t;
-          Lwt.return (`File h)
-    in
-    let unlisten =
-      listen stream (fun path ->
-          events := path :: !events;
-          Lwt_condition.signal cond ();
-          Lwt.return_unit)
-    in
-    Hook.v ~wait_for_changes ~dir f >|= fun unpoll () ->
-    stop_runloop () >>= fun () ->
-    unlisten () >>= fun () -> unpoll ()
+    Core.spawn ~sw (fun ~sw ~ready ->
+        (* Every change triggers a full scan: pending changes are merged. *)
+        let pending = ref false in
+        let cond = Lwt_condition.create () in
+        let stream = start_runloop ~sw dir in
+        let rec wait_for_changes () =
+          if !pending then (
+            pending := false;
+            Lwt.return `Unknown)
+          else Lwt_condition.wait cond >>= wait_for_changes
+        in
+        let wait_for_changes () = Lwt_eio.run_lwt wait_for_changes in
+        Eio.Fiber.both
+          (fun () ->
+            listen dir stream (fun _path ->
+                pending := true;
+                Lwt_condition.signal cond ();
+                Lwt.return_unit))
+          (fun () -> Hook.run ~ready ~wait_for_changes ~dir f))
   in
-  lazy (Core.create listen)
+  Core.create ~sw listen
 
 let mode = `FSEvents
 

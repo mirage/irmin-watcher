@@ -8,13 +8,13 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
-val v : Core.t Lazy.t
-(** [v id p f] is the hook calling [f] everytime a sub-path of [p] is modified.
-    Return a function to call to remove the hook. Use inofity to be notified on
-    filesystem changes. *)
+val v : sw:Eio.Switch.t -> polling_time:float -> Core.t
+(** [v ~sw ~polling_time] is a watcher using Inotify to be notified of
+    filesystem changes, with its fibers attached to [sw]. Where Inotify is not
+    available, it is the polling watcher {!Polling.v}. *)
 
 val mode : [ `Inotify | `Polling ]
-(** [mode] is [Inotify] on Linux and [`Polling] on Darwin. *)
+(** [mode] is [`Inotify] on Linux and [`Polling] elsewhere. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

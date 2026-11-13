@@ -4,81 +4,77 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-open Lwt.Infix
-
 let src = Logs.Src.create "irw-inotify" ~doc:"Irmin watcher using Inotify"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-let rec mkdir d =
-  let perm = 0o0700 in
-  try Unix.mkdir d perm with
-  | Unix.Unix_error (Unix.EEXIST, "mkdir", _) -> ()
-  | Unix.Unix_error (Unix.ENOENT, "mkdir", _) ->
-      mkdir (Filename.dirname d);
-      Unix.mkdir d perm
-
-let start_watch dir =
-  Log.debug (fun l -> l "start_watch %s" dir);
-  if not (Sys.file_exists dir) then mkdir dir;
-  Lwt_inotify.create () >>= fun i ->
-  Lwt_inotify.add_watch i dir
-    [ Inotify.S_Create; Inotify.S_Modify; Inotify.S_Move; Inotify.S_Delete ]
-  >|= fun u ->
-  let stop () = Lwt_inotify.rm_watch i u >>= fun () -> Lwt_inotify.close i in
-  (i, stop)
+(* [start_watch ~sw dir] is an inotify descriptor watching [dir]. It is closed
+   when [sw] is released, which also removes the watch. *)
+let start_watch ~sw dir =
+  Log.debug (fun l -> l "start_watch %a" Eio.Path.pp dir);
+  (* [dir] may be created concurrently by another hook. *)
+  Eio.Path.mkdirs ~exists_ok:true ~perm:0o700 dir;
+  let i = Eio_inotify.create () in
+  Eio.Switch.on_release sw (fun () -> Eio_inotify.close i);
+  let _ : Inotify.watch =
+    Eio_inotify.add_watch i (Eio.Path.native_exn dir)
+      [ Inotify.S_Create; Inotify.S_Modify; Inotify.S_Move; Inotify.S_Delete ]
+  in
+  i
 
 let listen dir i fn =
-  let event_kinds (_, es, _, _) = es in
   let pp_kind = Fmt.of_to_string Inotify.string_of_event_kind in
-  let path_of_event (_, _, _, p) =
-    match p with None -> dir | Some p -> Filename.concat dir p
+  let rec iter () =
+    let _, es, _, name = Eio_inotify.read i in
+    Log.debug (fun l ->
+        l "inotify: %a %a %a" Eio.Path.pp dir
+          Fmt.(option string)
+          name
+          Fmt.(Dump.list pp_kind)
+          es);
+    (* An event without a file name is about [dir] itself, or a queue
+       overflow. An event on a sub-directory concerns all the files under it.
+       Rescan the whole directory in both cases. *)
+    fn
+      (match name with
+      | Some name when not (List.mem Inotify.Isdir es) -> `File name
+      | _ -> `Unknown);
+    iter ()
   in
-  let rec iter i =
-    Lwt.try_bind
-      (fun () ->
-        Lwt_inotify.read i >>= fun e ->
-        let path = path_of_event e in
-        let es = event_kinds e in
-        Log.debug (fun l -> l "inotify: %s %a" path Fmt.(Dump.list pp_kind) es);
-        fn path;
-        Lwt.return_unit)
-      (fun () -> iter i)
-      (function
-        | Unix.Unix_error (Unix.EBADF, _, _) ->
-            Lwt.return_unit (* i has just been closed by {!stop} *)
-        | e -> Lwt.fail e)
-  in
-  Core.stoppable (fun () -> iter i)
+  iter ()
 
 (* Note: we use Inotify to detect any change, and we re-read the full
    tree on every change (so very similar to active polling, but
    blocking on incoming Inotify events instead of sleeping). We could
    probably do better, but at the moment it is more robust to do so,
    to avoid possible duplicated events. *)
-let v =
+let v ~sw ~polling_time:_ =
   let listen dir f =
     Log.info (fun l -> l "Inotify mode");
-    let events = ref [] in
-    let cond = Lwt_condition.create () in
-    start_watch dir >>= fun (i, stop_watch) ->
-    let rec wait_for_changes () =
-      match List.rev !events with
-      | [] -> Lwt_condition.wait cond >>= wait_for_changes
-      | h :: t ->
-          events := List.rev t;
-          Lwt.return (`File h)
-    in
-    let unlisten =
-      listen dir i (fun path ->
-          events := path :: !events;
-          Lwt_condition.signal cond ())
-    in
-    Hook.v ~wait_for_changes ~dir f >|= fun unpoll () ->
-    stop_watch () >>= fun () ->
-    unlisten () >>= fun () -> unpoll ()
+    Core.spawn ~sw (fun ~sw ~ready ->
+        let i = start_watch ~sw dir in
+        let events = Eio.Stream.create max_int in
+        let rec drain () =
+          match Eio.Stream.take_nonblocking events with
+          | Some _ -> drain ()
+          | None -> ()
+        in
+        (* Merge the changes queued so far: a full scan covers all of them,
+           and a file changed several times is read once. *)
+        let rec merge files = function
+          | Some `Unknown ->
+              drain ();
+              `Unknown
+          | Some (`File file) ->
+              merge (file :: files) (Eio.Stream.take_nonblocking events)
+          | None -> `Files (List.sort_uniq String.compare files)
+        in
+        let wait_for_changes () = merge [] (Some (Eio.Stream.take events)) in
+        Eio.Fiber.both
+          (fun () -> listen dir i (Eio.Stream.add events))
+          (fun () -> Hook.run ~ready ~wait_for_changes ~dir f))
   in
-  lazy (Core.create listen)
+  Core.create ~sw listen
 
 let mode = `Inotify
 

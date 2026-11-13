@@ -8,25 +8,60 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
-val v : Core.t
-(** [v id p f] is the listen hook calling [f] everytime a sub-path of [p] is
-    modified. Return a function to call to remove the hook. Default to polling
-    if no better solution is available. FSevents and Inotify backends are
-    available. *)
-
 val mode : [ `FSEvents | `Inotify | `Polling ]
+(** [mode] is the backend used by the watchers: FSevents on macOS, Inotify on
+    Linux and polling elsewhere. *)
+
+type t
+(** The type for watchers. A watcher runs at most one watchdog per directory,
+    shared by all the hooks registered on that directory. *)
+
+val v : ?polling_time:float -> sw:Eio.Switch.t -> unit -> t
+(** [v ~sw ()] is a new watcher using the {!mode} backend. With the polling
+    backend, it scans the watched directories every [polling_time] seconds
+    (default [1.]); [v] raises [Invalid_argument] if [polling_time] is not
+    positive. The fibers watching directories are attached to [sw]. A program
+    usually creates a single watcher and registers all its hooks on it.
+
+    Once [sw] is cancelled, the watcher stops watching, and {!hook} raises
+    [Invalid_argument]. [v] raises [Invalid_argument] if [sw] is finished. An
+    error of the watcher itself, such as a failure to read Inotify events, fails
+    [sw].
+
+    With the FSevents backend, the watcher runs Lwt code through [Lwt_eio]: an
+    [Lwt_eio] event loop must be running in the domain of [sw] for as long as
+    [sw] (see [Lwt_eio.with_event_loop]). *)
+
+val hook :
+  t -> int -> Eio.Fs.dir_ty Eio.Path.t -> (string -> unit) -> unit -> unit
+(** [hook t id p f] calls [f] everytime a file under [p] is created, modified or
+    removed, and returns a function that removes the hook. [f] receives the path
+    of the file relative to [p], using ["/"] as separator. [id] names the hook
+    in the logs; removing a hook does not remove the other hooks with the same
+    [id].
+
+    [hook] returns once [p] has been read: later changes are reported. It raises
+    the errors met while starting to watch [p]. The files and directories under
+    [p] that cannot be read are logged, keep their previous state, and are read
+    again later. Symbolic links to directories are not followed, while symbolic
+    links to files are read. With the Inotify backend, [p] is created if it does
+    not exist, the changes to the files in sub-directories of [p], and to the
+    targets of symbolic links, are only reported when a sub-directory is
+    created, removed or renamed, and no change is reported any more once [p] is
+    removed.
+
+    [f] runs in a fiber attached to the switch of [t], possibly at the same time
+    as other callbacks. The watcher waits for the callbacks before looking for
+    the next changes in [p]: a blocking [f] delays the other hooks on [p]. The
+    exceptions it raises are logged. [f] is not called once the hook is removed,
+    and removing the last hook on [p] from [f] cancels [f]. *)
 
 type stats = { watchdogs : int; dispatches : int }
+(** The type for watcher statistics: the number of active watchdogs, and the
+    number of registered hooks, for all directories. *)
 
-val hook : Core.hook
-(** [hook t] is an {!Irmin.Watcher} compatible representation of {!v}. *)
-
-val stats : unit -> stats
-(** [stats ()] is a snapshot of [v]'s stats. *)
-
-val set_polling_time : float -> unit
-(** [set_polling_time f] set the polling interval to [f]. Only valid when
-    [mode = `Polling]. *)
+val stats : t -> stats
+(** [stats t] is a snapshot of [t]'s statistics. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

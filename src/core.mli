@@ -25,13 +25,14 @@ module Digests : sig
   (** [files t] is the list of files whose digest is stored in [t]. *)
 end
 
-(** Dispatch listening functions. *)
+(** Dispatch listening functions. Directories are named by their native path
+    ({!Eio.Path.native_exn}). *)
 module Dispatch : sig
   type t
   (** The type for callback dispatches. *)
 
   val empty : unit -> t
-  (** [create ()] is the empty dispatch table. *)
+  (** [empty ()] is the empty dispatch table. *)
 
   val clear : t -> unit
   (** [clear t] clears the contents of the dispatch table [t]. All previous
@@ -41,17 +42,14 @@ module Dispatch : sig
   (** [stats t ~dir] is the number of active callbacks registered for the
       directory [dir]. *)
 
-  val apply : t -> dir:string -> file:string -> unit Lwt.t
+  val apply : t -> dir:string -> file:string -> unit
   (** [apply t ~dir ~file] calls [f file] for every callback [f] registered for
       the directory [dir]. *)
 
-  val add : t -> id:int -> dir:string -> (string -> unit Lwt.t) -> unit
-  (** [add t ~id ~dir f] adds a new callback [f] to the directory [dir], using
-      the unique identifier [id]. *)
-
-  val remove : t -> id:int -> dir:string -> unit
-  (** [remove t ~id ~dir] removes the callback with ID [id] on the directory
-      [dir]. *)
+  val add : t -> id:int -> dir:string -> (string -> unit) -> unit -> unit
+  (** [add t ~id ~dir f] adds a new callback [f] to the directory [dir], and
+      returns a function that removes it. [id] names [f] in the logs: several
+      callbacks can have the same [id]. *)
 
   val length : t -> int
   (** [length t] is [t]'s length. *)
@@ -64,37 +62,41 @@ module Watchdog : sig
   (** The type for filesystem watchdogs. *)
 
   val dispatch : t -> Dispatch.t
-  (** [dispath t] is the table of [t]'s callback dispatch. *)
+  (** [dispatch t] is the callback dispatch table of [t]. *)
 
-  type hook = (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
+  type hook = (string -> unit) -> unit -> unit
   (** The type for watchdog hook. *)
 
   val empty : unit -> t
   (** [empty ()] is the empty watchdog, monitoring no directory. *)
 
-  val clear : t -> unit Lwt.t
-  (** [clear ()] stops all the currently active watchdogs. *)
+  val clear : t -> unit
+  (** [clear t] stops all the currently active watchdogs. *)
 
-  val start : t -> dir:string -> hook -> unit Lwt.t
+  val start : t -> dir:string -> hook -> unit
   (** [start t ~dir h] adds a new callback hook on the directory [dir], starting
       a new watchdog if needed otherwise re-using the previous one. *)
 
-  val stop : t -> dir:string -> unit Lwt.t
-  (** [stop t ~dir] stops the filesystem watchdog on directory [dir] (if any). *)
+  val stop : t -> dir:string -> unit
+  (** [stop t ~dir] stops the filesystem watchdog on directory [dir], if there
+      is one and no callback is registered for [dir] any more. *)
 
   val length : t -> int
-  (** [length t] is the number of watchdog threads. *)
+  (** [length t] is the number of running watchdogs. *)
 end
 
-type hook =
-  int -> string -> (string -> unit Lwt.t) -> (unit -> unit Lwt.t) Lwt.t
+type hook = int -> Eio.Fs.dir_ty Eio.Path.t -> (string -> unit) -> unit -> unit
 (** The type for Irmin.Watch hooks. *)
 
 type t
 (** The type for listeners. *)
 
-val create : (string -> Watchdog.hook) -> t
-(** [create h] is the Irmin watcher using the update hook [h]. *)
+val create : sw:Eio.Switch.t -> (Eio.Fs.dir_ty Eio.Path.t -> Watchdog.hook) -> t
+(** [create ~sw h] is the Irmin watcher using the update hook [h], whose
+    watchdogs run in fibers attached to [sw]. Once [sw] is cancelled, its hook
+    raises [Invalid_argument], or [Cancelled] if its caller is cancelled too,
+    and its watchdogs are forgotten once [sw] is finished. [create] raises
+    [Invalid_argument] if [sw] is finished. *)
 
 val watchdog : t -> Watchdog.t
 (** [watchdog t] is [t]'s watchdog. *)
@@ -104,11 +106,18 @@ val hook : t -> hook
 
 (** {1 Helpers} *)
 
-val stoppable : (unit -> unit Lwt.t) -> unit -> unit Lwt.t
-(** [stoppable t] is a function [f] such that calling [f] will cancel the thread
-    [t]. *)
-
-val default_polling_time : float ref
+val spawn :
+  sw:Eio.Switch.t ->
+  (sw:Eio.Switch.t -> ready:(unit -> unit) -> unit) ->
+  unit ->
+  unit
+(** [spawn ~sw f] runs [f ~sw:sw' ~ready] in a new fiber attached to [sw]. [f]
+    attaches its resources to the switch [sw'], and calls [ready ()] once it is
+    set up. [spawn ~sw f] returns once [f] has called [ready ()], or raises the
+    exception [f] raised before that. It returns a function that cancels [f];
+    [sw'] then releases [f]'s resources once all of [f]'s fibers are finished.
+    [spawn] raises [Invalid_argument] if [sw] is cancelled. If the caller is
+    cancelled before [f] is ready, [f] is cancelled too. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

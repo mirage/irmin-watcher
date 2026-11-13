@@ -4,27 +4,23 @@
    %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-open Lwt.Infix
-
 let src = Logs.Src.create "irw-polling" ~doc:"Irmin watcher using using polling"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-let listen ~wait_for_changes dir =
+let listen ~sw ~wait_for_changes dir callback =
   Log.info (fun l -> l "Polling mode");
-  Hook.v ~wait_for_changes ~dir
-
-let with_delay delay =
-  let wait_for_changes () = Lwt_unix.sleep delay >|= fun () -> `Unknown in
-  Core.create (listen ~wait_for_changes)
+  Core.spawn ~sw (fun ~sw:_ ~ready ->
+      Hook.run ~ready ~wait_for_changes ~dir callback)
 
 let mode = `Polling
 
-let v =
+let v ~sw ~polling_time =
   let wait_for_changes () =
-    Lwt_unix.sleep !Core.default_polling_time >|= fun () -> `Unknown
+    Eio_unix.sleep polling_time;
+    `Unknown
   in
-  lazy (Core.create (listen ~wait_for_changes))
+  Core.create ~sw (listen ~sw ~wait_for_changes)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2016 Thomas Gazagnaire

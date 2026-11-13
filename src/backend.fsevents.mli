@@ -8,10 +8,10 @@
 
     {e %%VERSION%% — {{:%%PKG_HOMEPAGE%%} homepage}} *)
 
-val v : Core.t Lazy.t
-(** [v id p f] is the hook calling [f] everytime a sub-path of [p] is modified.
-    Return a function to call to remove the hook. Use the FSevent framework to
-    be notified on filesystem changes. *)
+val v : sw:Eio.Switch.t -> polling_time:float -> Core.t
+(** [v ~sw ~polling_time] is a watcher using the FSevents framework to be
+    notified of filesystem changes, with its fibers attached to [sw].
+    [polling_time] is ignored. *)
 
 val mode : [ `FSEvents ]
 

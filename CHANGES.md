@@ -1,3 +1,47 @@
+### 0.6.0 (unreleased)
+
+- Move from Lwt to Eio (#37, #46, @patricoferris, @clecat, @zshipko, @balat).
+  This changes the API:
+  - `hook`, the callbacks and the functions removing hooks are in direct
+    style instead of returning `Lwt.t` values. `hook` must be called from an
+    Eio fiber.
+  - The watched directory is an `Eio.Fs.dir_ty Eio.Path.t` instead of a
+    string. Callbacks still receive the path of the changed file relative to
+    it.
+  - `v` is now a function creating a watcher, `Irmin_watcher.v ~sw ()`, and
+    there is no global watcher. `hook` and `stats` take the watcher as their
+    first argument.
+  - `set_polling_time` is replaced by the `?polling_time` argument of `v`,
+    which raises `Invalid_argument` if it is not positive.
+  - `hook` returns once the directory has been read, and raises the errors
+    met while starting to watch it. It raises `Invalid_argument` once the
+    switch of the watcher is cancelled.
+  - Callbacks always receive paths with `/` as separator, also on Windows.
+  - Watched directories are no longer resolved with `realpath`: a directory
+    reached through two different paths gets two watchdogs.
+  - Exceptions raised by callbacks are logged.
+  - The FSevents backend (macOS) needs a running `Lwt_eio` event loop.
+- Removing a hook, even twice, no longer removes the other hooks with the
+  same id.
+- A callback is no longer called once its hook is removed.
+- A directory removed while it is scanned no longer stops the watcher.
+- Files that cannot be read keep their previous state and are read again
+  later, instead of being reported as removed.
+- Scan the watched directory once instead of twice when a hook starts.
+- Do not follow symbolic links to directories: a link to a parent directory
+  made scans very slow, or endless, and a link out of the watched directory
+  made every scan read the target too. Symbolic links to files are still
+  read.
+- Digest the files larger than 1 MB in a system thread, so that the other
+  fibers keep running.
+- Full scans no longer read again the files whose status (size, times, inode)
+  has not changed, except on Windows.
+- With Inotify, rescan the directory when a sub-directory changes or when the
+  event queue overflows.
+- With Inotify, read a file changed several times in a row only once.
+- Require OCaml 5.2 and Eio 1.6 or later.
+- Depend on `lwt`, `cf-lwt` and `fsevents-lwt` only on macOS.
+
 ### 0.5.1 (2026-04-24)
 
 - Use `_WIN32` and `MAX_PATH` on Windows to support MSVC (#34, @jonahbeckford)
