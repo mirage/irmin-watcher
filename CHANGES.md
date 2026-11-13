@@ -1,4 +1,4 @@
-### 0.6.0 (unreleased)
+### 0.6.0 (2026-11-13)
 
 - Move from Lwt to Eio (#37, #46, @patricoferris, @clecat, @zshipko, @balat).
   This changes the API:
